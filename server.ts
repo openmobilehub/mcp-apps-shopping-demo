@@ -84,7 +84,26 @@ export function createServer(): McpServer {
     async (): Promise<ReadResourceResult> => {
       const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
       return {
-        contents: [{ uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html }],
+        contents: [
+          {
+            uri: RESOURCE_URI,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: html,
+            // The UI renders in a sandboxed iframe with a strict CSP; product
+            // images load from picsum.photos, which redirects to fastly.
+            // Both hosts must be allowlisted or images are blocked.
+            _meta: {
+              ui: {
+                csp: {
+                  resourceDomains: [
+                    "https://picsum.photos",
+                    "https://fastly.picsum.photos",
+                  ],
+                },
+              },
+            },
+          },
+        ],
       };
     },
   );
