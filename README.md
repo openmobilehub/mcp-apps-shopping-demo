@@ -2,8 +2,11 @@
 
 An MCP App for Claude Desktop that shows an interactive product picker in the
 chat. Browse a grid of products, add items with quantity steppers, and the cart
-total is recomputed server-side on every change. Confirming sends the priced
-cart back into the conversation so Claude can act on it.
+total is recomputed server-side on every change. Clicking "Place order" creates
+an in-memory order (e.g. `ORD-1042`), shows an order confirmation view with
+line items and total, and notifies Claude in chat so it can acknowledge the
+order. Orders are kept in-memory (lost on server restart); payment/checkout is
+a planned follow-up phase.
 
 ## Build
 
@@ -33,8 +36,9 @@ replacing the path with the absolute path to this project:
 ```
 
 Restart Claude Desktop. Then ask: "Show me the product picker." Claude calls
-`browse-products`, the grid renders inline, you adjust quantities, and
-confirming adds the priced cart to the conversation.
+`browse-products`, the grid renders inline, you adjust quantities, and clicking
+"Place order" creates an order with an `ORD-####` id, shows the confirmation
+view, and Claude acknowledges the order in chat.
 
 Product images load from picsum.photos (allowlisted via the resource CSP); if a
 host blocks them, each card falls back to an inline SVG placeholder.
@@ -43,9 +47,10 @@ host blocks them, each card falls back to an inline SVG placeholder.
 
 The UI normally talks to the MCP host over a `postMessage` bridge. When opened
 directly in a browser it detects there is no host and runs in **standalone
-mode**: it loads the sample catalog locally and shows the selection in an alert
-instead of sending it to a chat. This is the fast way to iterate on the UI
-without Claude Desktop.
+mode**: it loads the sample catalog locally, and clicking "Place order" builds
+the order locally (`ORD-LOCAL`) and shows the same order-confirmation view —
+no alert, no Claude Desktop required. This is the fast way to iterate on the
+UI without Claude Desktop.
 
 ```bash
 npm run dev   # opens http://localhost:5173/mcp-app.html
@@ -64,8 +69,9 @@ npx @modelcontextprotocol/inspector node dist/main.js --stdio   # inspect tools/
 ## Project layout
 
 - `server.ts` — MCP server: UI resource + `browse-products`, `price-cart`
-  (UI-only, recomputes the total), `confirm-selection`
+  (UI-only, recomputes the total), `place-order` (UI-only; persists an
+  in-memory order)
 - `main.ts` — stdio (Claude Desktop) and HTTP entrypoints
-- `catalog.ts` — sample products + `priceCart` helper
+- `catalog.ts` — sample products + `priceCart` / `createOrder` helpers
 - `src/app.tsx` — React cart UI (host + standalone modes)
 - `mcp-app.html` / `vite.config.ts` — single-file UI bundle
