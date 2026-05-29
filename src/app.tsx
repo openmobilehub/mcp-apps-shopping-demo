@@ -1,36 +1,56 @@
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { StrictMode, useCallback, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CATALOG, type Product } from "../catalog";
+import {
+  CATALOG,
+  priceCart as priceCartLocal,
+  type CartItemInput,
+  type PricedCart,
+  type Product,
+} from "../catalog";
 import styles from "./app.module.css";
 
 type Insets = McpUiHostContext["safeAreaInsets"];
+type PriceCartFn = (items: CartItemInput[]) => Promise<PricedCart>;
 
-function parseCatalog(result: CallToolResult): Product[] {
+function parseJsonContent<T>(result: CallToolResult): T | null {
   for (const block of result.content ?? []) {
     if (block.type === "text") {
       try {
-        const parsed = JSON.parse(block.text);
-        if (Array.isArray(parsed?.products)) {
-          return parsed.products as Product[];
-        }
+        return JSON.parse(block.text) as T;
       } catch {
-        // not the JSON block; keep scanning
+        // not JSON; keep scanning
       }
     }
   }
-  return [];
+  return null;
 }
 
 function formatMoney(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
-// True when the app is NOT embedded in an MCP host (i.e. opened directly in a
-// browser via `npm run dev`). The host renders the app inside an iframe, so a
-// top-level window means we are standalone. `?standalone` forces it.
+// Deterministic muted color from a product id, for image fallbacks.
+function colorFor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return `hsl(${hash % 360} 45% 55%)`;
+}
+
+// Inline SVG placeholder used when a product image fails to load (e.g. blocked
+// by the host CSP). No network required.
+function placeholderDataUri(p: Product): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300">
+<rect width="400" height="300" fill="${colorFor(p.id)}"/>
+<text x="200" y="150" fill="rgba(255,255,255,0.95)" font-family="system-ui,sans-serif"
+ font-size="22" font-weight="600" text-anchor="middle" dominant-baseline="middle">${p.category}</text>
+</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+// True when not embedded in an MCP host (opened directly via `npm run dev`).
 function isStandalone(): boolean {
   const params = new URLSearchParams(window.location.search);
   return params.has("standalone") || window.self === window.top;
@@ -47,32 +67,28 @@ function HostApp() {
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
-        setProducts(parseCatalog(result));
+        const data = parseJsonContent<{ products: Product[] }>(result);
+        if (data?.products) setProducts(data.products);
       };
-      app.onhostcontextchanged = (params) => {
-        setInsets(params.safeAreaInsets);
-      };
+      app.onhostcontextchanged = (params) => setInsets(params.safeAreaInsets);
       app.onerror = console.error;
     },
   });
 
+  const priceCart = useCallback<PriceCartFn>(
+    async (items) => {
+      const result = await app!.callServerTool({ name: "price-cart", arguments: { items } });
+      return parseJsonContent<PricedCart>(result) ?? emptyCart();
+    },
+    [app],
+  );
+
   const onConfirm = useCallback(
-    async (chosen: Product[], total: number, currency: string) => {
+    async (cart: PricedCart) => {
       if (!app) return;
-      await app.callServerTool({
-        name: "confirm-selection",
-        arguments: { productIds: chosen.map((p) => p.id) },
-      });
-      const lines = chosen.map((p) => `- ${p.name} (${formatMoney(p.price, p.currency)})`);
-      await app.sendMessage({
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `I selected ${chosen.length} product(s):\n${lines.join("\n")}\n\nTotal: ${formatMoney(total, currency)}`,
-          },
-        ],
-      });
+      const items = cart.lines.map((l) => ({ productId: l.id, quantity: l.quantity }));
+      await app.callServerTool({ name: "confirm-selection", arguments: { items } });
+      await app.sendMessage({ role: "user", content: [{ type: "text", text: cartMessage(cart) }] });
     },
     [app],
   );
@@ -80,59 +96,93 @@ function HostApp() {
   if (error) return <div className={styles.status}><strong>Error:</strong> {error.message}</div>;
   if (!app) return <div className={styles.status}>Connecting…</div>;
 
-  return <Picker products={products} insets={insets} onConfirm={onConfirm} />;
+  return <Picker products={products} insets={insets} priceCart={priceCart} onConfirm={onConfirm} />;
 }
 
 // ----- Standalone mode: runs in a plain browser with the local catalog -----
 
 function StandaloneApp() {
-  const onConfirm = useCallback(async (chosen: Product[], total: number, currency: string) => {
-    const summary = chosen.map((p) => `${p.name} (${formatMoney(p.price, p.currency)})`).join("\n");
-    console.info("[standalone] selection:", chosen);
-    window.alert(`Selected ${chosen.length} product(s):\n${summary}\n\nTotal: ${formatMoney(total, currency)}`);
+  const priceCart = useCallback<PriceCartFn>(async (items) => priceCartLocal(items), []);
+  const onConfirm = useCallback(async (cart: PricedCart) => {
+    window.alert(cartMessage(cart));
   }, []);
-
-  return <Picker products={CATALOG} onConfirm={onConfirm} />;
+  return <Picker products={CATALOG} priceCart={priceCart} onConfirm={onConfirm} />;
 }
 
-// ----- Shared grid UI -----
+function emptyCart(): PricedCart {
+  return { lines: [], itemCount: 0, total: 0, currency: "USD", unknownIds: [] };
+}
+
+function cartMessage(cart: PricedCart): string {
+  const lines = cart.lines.map(
+    (l) => `- ${l.quantity}× ${l.name} (${formatMoney(l.lineTotal, l.currency)})`,
+  );
+  return `I selected ${cart.itemCount} item(s):\n${lines.join("\n")}\n\nTotal: ${formatMoney(cart.total, cart.currency)}`;
+}
+
+// ----- Shared cart UI -----
 
 interface PickerProps {
   products: Product[];
   insets?: Insets;
-  onConfirm: (chosen: Product[], total: number, currency: string) => Promise<void>;
+  priceCart: PriceCartFn;
+  onConfirm: (cart: PricedCart) => Promise<void>;
 }
 
-function Picker({ products, insets, onConfirm }: PickerProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+function Picker({ products, insets, priceCart, onConfirm }: PickerProps) {
+  const [quantities, setQuantities] = useState<Map<string, number>>(new Map());
+  const [cart, setCart] = useState<PricedCart>(emptyCart());
+  const [pricing, setPricing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const reqId = useRef(0);
 
-  const toggle = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  const items = useMemo<CartItemInput[]>(
+    () =>
+      [...quantities.entries()]
+        .filter(([, q]) => q > 0)
+        .map(([productId, quantity]) => ({ productId, quantity })),
+    [quantities],
+  );
+
+  // Recompute the cart total server-side whenever the quantities change.
+  useEffect(() => {
+    if (items.length === 0) {
+      setCart(emptyCart());
+      setPricing(false);
+      return;
+    }
+    const myReq = ++reqId.current;
+    setPricing(true);
+    priceCart(items)
+      .then((priced) => {
+        if (myReq === reqId.current) setCart(priced);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (myReq === reqId.current) setPricing(false);
+      });
+  }, [items, priceCart]);
+
+  const setQty = useCallback((id: string, qty: number) => {
+    setQuantities((prev) => {
+      const next = new Map(prev);
+      if (qty <= 0) next.delete(id);
+      else next.set(id, qty);
       return next;
     });
   }, []);
 
-  const { chosen, count, total, currency } = useMemo(() => {
-    const chosen = products.filter((p) => selected.has(p.id));
-    const total = chosen.reduce((sum, p) => sum + p.price, 0);
-    return { chosen, count: chosen.length, total, currency: chosen[0]?.currency ?? "USD" };
-  }, [products, selected]);
-
   const handleConfirm = useCallback(async () => {
-    if (chosen.length === 0) return;
+    if (cart.itemCount === 0) return;
     setSubmitting(true);
     try {
-      await onConfirm(chosen, total, currency);
+      await onConfirm(cart);
     } catch (e) {
       console.error(e);
     } finally {
       setSubmitting(false);
     }
-  }, [chosen, total, currency, onConfirm]);
+  }, [cart, onConfirm]);
 
   return (
     <main
@@ -149,30 +199,47 @@ function Picker({ products, insets, onConfirm }: PickerProps) {
       ) : (
         <div className={styles.grid}>
           {products.map((p) => {
-            const isSelected = selected.has(p.id);
+            const qty = quantities.get(p.id) ?? 0;
             return (
-              <div
-                key={p.id}
-                className={`${styles.card} ${isSelected ? styles.cardSelected : ""}`}
-                onClick={() => toggle(p.id)}
-                role="button"
-                aria-pressed={isSelected}
-              >
-                <img className={styles.thumb} src={p.image} alt={p.name} />
+              <div key={p.id} className={`${styles.card} ${qty > 0 ? styles.cardSelected : ""}`}>
+                <img
+                  className={styles.thumb}
+                  src={p.image}
+                  alt={p.name}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = placeholderDataUri(p);
+                  }}
+                />
                 <div className={styles.cardBody}>
                   <span className={styles.category}>{p.category}</span>
                   <span className={styles.name}>{p.name}</span>
                   <span className={styles.desc}>{p.description}</span>
                   <div className={styles.priceRow}>
                     <span className={styles.price}>{formatMoney(p.price, p.currency)}</span>
-                    <input
-                      className={styles.check}
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggle(p.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`Select ${p.name}`}
-                    />
+                    {qty === 0 ? (
+                      <button className={styles.addBtn} onClick={() => setQty(p.id, 1)}>
+                        Add
+                      </button>
+                    ) : (
+                      <div className={styles.stepper}>
+                        <button
+                          className={styles.qtyBtn}
+                          onClick={() => setQty(p.id, qty - 1)}
+                          aria-label={`Decrease ${p.name}`}
+                        >
+                          −
+                        </button>
+                        <span className={styles.qty}>{qty}</span>
+                        <button
+                          className={styles.qtyBtn}
+                          onClick={() => setQty(p.id, qty + 1)}
+                          aria-label={`Increase ${p.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -183,14 +250,15 @@ function Picker({ products, insets, onConfirm }: PickerProps) {
 
       <div className={styles.footer}>
         <span className={styles.summary}>
-          {count} selected · {formatMoney(total, currency)}
+          {cart.itemCount} item(s) · {formatMoney(cart.total, cart.currency)}
+          {pricing ? " · updating…" : ""}
         </span>
         <button
           className={styles.confirm}
-          disabled={count === 0 || submitting}
+          disabled={cart.itemCount === 0 || submitting || pricing}
           onClick={handleConfirm}
         >
-          {submitting ? "Adding…" : "Add selection to chat"}
+          {submitting ? "Adding…" : "Add to chat"}
         </button>
       </div>
     </main>

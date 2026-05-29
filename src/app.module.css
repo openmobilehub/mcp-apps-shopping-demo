@@ -84,10 +84,54 @@
   font-weight: 600;
 }
 
-.check {
-  width: 18px;
-  height: 18px;
-  accent-color: #4f7cff;
+.addBtn {
+  appearance: none;
+  border: 1px solid #4f7cff;
+  background: transparent;
+  color: #4f7cff;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: rgba(79, 124, 255, 0.12);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qtyBtn {
+  appearance: none;
+  border: 1px solid light-dark(#d0d0d0, #4a4a4a);
+  background: light-dark(#ffffff, #2a2a2a);
+  color: inherit;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qtyBtn:hover {
+  border-color: #4f7cff;
+}
+
+.qty {
+  min-width: 16px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .footer {
