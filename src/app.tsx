@@ -1,19 +1,12 @@
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { CATALOG, type Product } from "../catalog";
 import styles from "./app.module.css";
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  image: string;
-  category: string;
-  description: string;
-}
+type Insets = McpUiHostContext["safeAreaInsets"];
 
 function parseCatalog(result: CallToolResult): Product[] {
   for (const block of result.content ?? []) {
@@ -35,9 +28,19 @@ function formatMoney(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
-function ProductPicker() {
+// True when the app is NOT embedded in an MCP host (i.e. opened directly in a
+// browser via `npm run dev`). The host renders the app inside an iframe, so a
+// top-level window means we are standalone. `?standalone` forces it.
+function isStandalone(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("standalone") || window.self === window.top;
+}
+
+// ----- Host mode: connects to the MCP host bridge -----
+
+function HostApp() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
+  const [insets, setInsets] = useState<Insets>();
 
   const { app, error } = useApp({
     appInfo: { name: "Product Picker", version: "1.0.0" },
@@ -47,52 +50,15 @@ function ProductPicker() {
         setProducts(parseCatalog(result));
       };
       app.onhostcontextchanged = (params) => {
-        setHostContext((prev) => ({ ...prev, ...params }));
+        setInsets(params.safeAreaInsets);
       };
       app.onerror = console.error;
     },
   });
 
-  useEffect(() => {
-    if (app) setHostContext(app.getHostContext());
-  }, [app]);
-
-  if (error) return <div className={styles.status}><strong>Error:</strong> {error.message}</div>;
-  if (!app) return <div className={styles.status}>Connecting…</div>;
-
-  return <PickerInner app={app} products={products} hostContext={hostContext} />;
-}
-
-interface PickerInnerProps {
-  app: App;
-  products: Product[];
-  hostContext?: McpUiHostContext;
-}
-
-function PickerInner({ app, products, hostContext }: PickerInnerProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [submitting, setSubmitting] = useState(false);
-
-  const toggle = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const { count, total, currency } = useMemo(() => {
-    const chosen = products.filter((p) => selected.has(p.id));
-    const total = chosen.reduce((sum, p) => sum + p.price, 0);
-    return { count: chosen.length, total, currency: chosen[0]?.currency ?? "USD" };
-  }, [products, selected]);
-
-  const handleConfirm = useCallback(async () => {
-    const chosen = products.filter((p) => selected.has(p.id));
-    if (chosen.length === 0) return;
-    setSubmitting(true);
-    try {
+  const onConfirm = useCallback(
+    async (chosen: Product[], total: number, currency: string) => {
+      if (!app) return;
       await app.callServerTool({
         name: "confirm-selection",
         arguments: { productIds: chosen.map((p) => p.id) },
@@ -107,21 +73,75 @@ function PickerInner({ app, products, hostContext }: PickerInnerProps) {
           },
         ],
       });
+    },
+    [app],
+  );
+
+  if (error) return <div className={styles.status}><strong>Error:</strong> {error.message}</div>;
+  if (!app) return <div className={styles.status}>Connecting…</div>;
+
+  return <Picker products={products} insets={insets} onConfirm={onConfirm} />;
+}
+
+// ----- Standalone mode: runs in a plain browser with the local catalog -----
+
+function StandaloneApp() {
+  const onConfirm = useCallback(async (chosen: Product[], total: number, currency: string) => {
+    const summary = chosen.map((p) => `${p.name} (${formatMoney(p.price, p.currency)})`).join("\n");
+    console.info("[standalone] selection:", chosen);
+    window.alert(`Selected ${chosen.length} product(s):\n${summary}\n\nTotal: ${formatMoney(total, currency)}`);
+  }, []);
+
+  return <Picker products={CATALOG} onConfirm={onConfirm} />;
+}
+
+// ----- Shared grid UI -----
+
+interface PickerProps {
+  products: Product[];
+  insets?: Insets;
+  onConfirm: (chosen: Product[], total: number, currency: string) => Promise<void>;
+}
+
+function Picker({ products, insets, onConfirm }: PickerProps) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const { chosen, count, total, currency } = useMemo(() => {
+    const chosen = products.filter((p) => selected.has(p.id));
+    const total = chosen.reduce((sum, p) => sum + p.price, 0);
+    return { chosen, count: chosen.length, total, currency: chosen[0]?.currency ?? "USD" };
+  }, [products, selected]);
+
+  const handleConfirm = useCallback(async () => {
+    if (chosen.length === 0) return;
+    setSubmitting(true);
+    try {
+      await onConfirm(chosen, total, currency);
     } catch (e) {
       console.error(e);
     } finally {
       setSubmitting(false);
     }
-  }, [app, products, selected, total, currency]);
+  }, [chosen, total, currency, onConfirm]);
 
   return (
     <main
       className={styles.main}
       style={{
-        paddingTop: hostContext?.safeAreaInsets?.top,
-        paddingRight: hostContext?.safeAreaInsets?.right,
-        paddingBottom: hostContext?.safeAreaInsets?.bottom,
-        paddingLeft: hostContext?.safeAreaInsets?.left,
+        paddingTop: insets?.top,
+        paddingRight: insets?.right,
+        paddingBottom: insets?.bottom,
+        paddingLeft: insets?.left,
       }}
     >
       {products.length === 0 ? (
@@ -178,7 +198,5 @@ function PickerInner({ app, products, hostContext }: PickerInnerProps) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ProductPicker />
-  </StrictMode>,
+  <StrictMode>{isStandalone() ? <StandaloneApp /> : <HostApp />}</StrictMode>,
 );

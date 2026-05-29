@@ -6,6 +6,9 @@ const isDevelopment = process.env.NODE_ENV === "development";
 
 export default defineConfig({
   plugins: [react(), viteSingleFile()],
+  server: {
+    open: "/mcp-app.html",
+  },
   build: {
     sourcemap: isDevelopment ? "inline" : undefined,
     cssMinify: !isDevelopment,

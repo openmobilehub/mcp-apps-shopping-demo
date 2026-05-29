@@ -9,6 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "dev": "vite",
     "build:ui": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build": "npm run typecheck && npm run build:ui && npm run build:server",

@@ -35,6 +35,21 @@ Restart Claude Desktop. Then ask: "Show me the product picker." Claude calls
 `browse-products`, the grid renders inline, and confirming a selection adds the
 chosen products to the conversation.
 
+## Preview in the browser
+
+The UI normally talks to the MCP host over a `postMessage` bridge. When opened
+directly in a browser it detects there is no host and runs in **standalone
+mode**: it loads the sample catalog locally and shows the selection in an alert
+instead of sending it to a chat. This is the fast way to iterate on the UI
+without Claude Desktop.
+
+```bash
+npm run dev   # opens http://localhost:5173/mcp-app.html
+```
+
+Standalone mode triggers automatically outside an iframe; append `?standalone`
+to force it.
+
 ## Develop / inspect
 
 ```bash
