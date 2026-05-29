@@ -1,3 +1,7 @@
+// _meta key carrying the catalog from browse-products to the UI. Kept out of
+// the tool's text content so the model doesn't re-render the list as a table.
+export const CATALOG_META_KEY = "product-picker/catalog";
+
 export interface Product {
   id: string;
   name: string;

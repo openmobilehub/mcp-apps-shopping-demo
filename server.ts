@@ -8,7 +8,7 @@ import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/s
 import { z } from "zod";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CATALOG, priceCart } from "./catalog.js";
+import { CATALOG, CATALOG_META_KEY, priceCart } from "./catalog.js";
 
 // Resolve the bundled UI relative to this module, working from both
 // source (server.ts) and compiled (dist/server.js).
@@ -51,14 +51,17 @@ export function createServer(): McpServer {
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async (): Promise<CallToolResult> => {
+      // The catalog rides in _meta (app-only, out-of-band) so the UI can render
+      // without the model echoing the full list back as text. The model sees
+      // only the short status line below.
       return {
         content: [
-          { type: "text", text: JSON.stringify({ products: CATALOG }) },
           {
             type: "text",
-            text: `Showing ${CATALOG.length} products. Select items in the picker and confirm.`,
+            text: `Opened the product picker with ${CATALOG.length} products. The user selects items there and confirms.`,
           },
         ],
+        _meta: { [CATALOG_META_KEY]: { products: CATALOG } },
       };
     },
   );

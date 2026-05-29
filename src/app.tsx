@@ -5,6 +5,7 @@ import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "r
 import { createRoot } from "react-dom/client";
 import {
   CATALOG,
+  CATALOG_META_KEY,
   priceCart as priceCartLocal,
   type CartItemInput,
   type PricedCart,
@@ -67,7 +68,7 @@ function HostApp() {
     capabilities: {},
     onAppCreated: (app) => {
       app.ontoolresult = async (result) => {
-        const data = parseJsonContent<{ products: Product[] }>(result);
+        const data = result._meta?.[CATALOG_META_KEY] as { products?: Product[] } | undefined;
         if (data?.products) setProducts(data.products);
       };
       app.onhostcontextchanged = (params) => setInsets(params.safeAreaInsets);
