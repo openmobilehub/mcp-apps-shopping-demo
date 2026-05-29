@@ -213,18 +213,20 @@ function Picker({ products, insets, priceCart, onPlaceOrder }: PickerProps) {
     setQuantities(new Map());
   }, []);
 
+  const mainStyle = useMemo(
+    () => ({
+      paddingTop: insets?.top,
+      paddingRight: insets?.right,
+      paddingBottom: insets?.bottom,
+      paddingLeft: insets?.left,
+    }),
+    [insets],
+  );
+
   if (placedOrder) {
     return (
-      <main
-        className={styles.main}
-        style={{
-          paddingTop: insets?.top,
-          paddingRight: insets?.right,
-          paddingBottom: insets?.bottom,
-          paddingLeft: insets?.left,
-        }}
-      >
-        <div className={styles.confirmation}>
+      <main className={styles.main} style={mainStyle}>
+        <div className={styles.confirmation} role="status" aria-live="polite">
           <div className={styles.confirmHeader}>
             <span className={styles.confirmTitle}>Order placed</span>
             <span className={styles.statusBadge}>{placedOrder.status}</span>
@@ -253,15 +255,7 @@ function Picker({ products, insets, priceCart, onPlaceOrder }: PickerProps) {
   }
 
   return (
-    <main
-      className={styles.main}
-      style={{
-        paddingTop: insets?.top,
-        paddingRight: insets?.right,
-        paddingBottom: insets?.bottom,
-        paddingLeft: insets?.left,
-      }}
-    >
+    <main className={styles.main} style={mainStyle}>
       {products.length === 0 ? (
         <div className={styles.status}>Loading products…</div>
       ) : (
