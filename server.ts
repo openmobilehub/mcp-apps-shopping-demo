@@ -8,7 +8,7 @@ import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/s
 import { z } from "zod";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { CATALOG, priceSelection } from "./catalog.js";
+import { CATALOG, priceCart } from "./catalog.js";
 
 // Resolve the bundled UI relative to this module, working from both
 // source (server.ts) and compiled (dist/server.js).
@@ -17,6 +17,16 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
   : import.meta.dirname;
 
 const RESOURCE_URI = "ui://product-picker/mcp-app.html";
+
+// Shared input shape: a cart of { productId, quantity } entries.
+const cartItemsSchema = {
+  items: z.array(
+    z.object({
+      productId: z.string(),
+      quantity: z.number().int(),
+    }),
+  ),
+};
 
 function formatMoney(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
@@ -53,21 +63,41 @@ export function createServer(): McpServer {
     },
   );
 
-  // Plain server tool the UI calls via callServerTool to price the final pick.
+  // UI-internal tool: recompute the cart total server-side on every change.
+  // Hidden from the model (visibility "app") — it returns the priced cart as
+  // JSON for the UI to render.
+  registerAppTool(
+    server,
+    "price-cart",
+    {
+      title: "Price Cart",
+      description: "Compute authoritative line items and total for the current cart.",
+      inputSchema: cartItemsSchema,
+      _meta: { ui: { resourceUri: RESOURCE_URI, visibility: ["app"] } },
+    },
+    async ({ items }): Promise<CallToolResult> => {
+      const cart = priceCart(items);
+      return { content: [{ type: "text", text: JSON.stringify(cart) }] };
+    },
+  );
+
+  // Records the user's final cart and returns a human-readable priced summary.
   server.registerTool(
     "confirm-selection",
     {
       title: "Confirm Selection",
       description: "Record the user's selected products and return a priced summary.",
-      inputSchema: { productIds: z.array(z.string()) },
+      inputSchema: cartItemsSchema,
     },
-    async ({ productIds }): Promise<CallToolResult> => {
-      const { items, total, currency, unknownIds } = priceSelection(productIds);
-      if (items.length === 0) {
+    async ({ items }): Promise<CallToolResult> => {
+      const { lines, itemCount, total, currency, unknownIds } = priceCart(items);
+      if (lines.length === 0) {
         return { content: [{ type: "text", text: "No products were selected." }] };
       }
-      const lines = items.map((p) => `- ${p.name} — ${formatMoney(p.price, p.currency)}`);
-      let summary = `Selected ${items.length} product(s):\n${lines.join("\n")}\n\nTotal: ${formatMoney(total, currency)}`;
+      const rendered = lines.map(
+        (l) => `- ${l.quantity}× ${l.name} — ${formatMoney(l.lineTotal, l.currency)}`,
+      );
+      let summary = `Selected ${itemCount} item(s):\n${rendered.join("\n")}\n\nTotal: ${formatMoney(total, currency)}`;
       if (unknownIds.length > 0) {
         summary += `\n\n(Ignored unknown ids: ${unknownIds.join(", ")})`;
       }
