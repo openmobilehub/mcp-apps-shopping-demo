@@ -97,6 +97,8 @@ function renderCheckoutPage(order: Order, token: string): string {
   .total { font-weight: 600; font-size: 16px; }
   .total td { border-bottom: none; padding-top: 16px; }
   .note { color: #888; font-size: 12px; margin-top: 12px; text-align: center; }
+  button { display: block; margin-top: 12px; width: 100%; padding: 12px; font-size: 14px; font-weight: 500; color: #1a1a1a; background: #fff; border: 1px solid #d0d0d0; border-radius: 8px; cursor: pointer; box-sizing: border-box; }
+  button:disabled { color: #888; cursor: default; }
 </style>
 </head>
 <body>
@@ -112,6 +114,14 @@ function renderCheckoutPage(order: Order, token: string): string {
     Authorize payment
   </a>
   <div class="note">You'll confirm the exact amount with your device. Demo — no real charge.</div>
+  <button id="place">Place order (instant demo)</button>
+  <div class="note">Skips the device prompt — no real charge.</div>
+  <script>
+    document.getElementById('place').addEventListener('click', function () {
+      this.disabled = true;
+      this.textContent = 'Order placed ✓ (demo)';
+    });
+  </script>
 </body>
 </html>`;
 }
