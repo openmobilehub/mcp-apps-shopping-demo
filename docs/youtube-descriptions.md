@@ -23,7 +23,7 @@ Built on the MCP Apps SDK (one UI bundle, runtime host detection) and deployed a
 Try it yourself — add this custom connector URL:
 https://mcp-apps-nine.vercel.app/mcp
 
-Source: https://github.com/dfzuluaga/mcp-apps-shopping-demo
+Source: https://github.com/dzuluaga/mcp-apps-shopping-demo
 
 #Claude #MCP #AIAgents #Anthropic #AgenticAI #ModelContextProtocol
 
@@ -48,7 +48,7 @@ The same UI bundle runs in ChatGPT via the window.openai bridge (text/html+skybr
 Try it yourself — add this custom connector URL:
 https://mcp-apps-nine.vercel.app/mcp
 
-Source: https://github.com/dfzuluaga/mcp-apps-shopping-demo
+Source: https://github.com/dzuluaga/mcp-apps-shopping-demo
 
 #ChatGPT #MCP #AIAgents #OpenAI #AgenticAI #ModelContextProtocol
 
@@ -72,6 +72,6 @@ This mirrors how real Claude/Gemini commerce connectors work: the agent builds a
 Try it yourself — add this custom connector URL:
 https://mcp-apps-nine.vercel.app/mcp
 
-Source: https://github.com/dfzuluaga/mcp-apps-shopping-demo
+Source: https://github.com/dzuluaga/mcp-apps-shopping-demo
 
 #Claude #MCP #AIAgents #Anthropic #AgenticAI #ModelContextProtocol
