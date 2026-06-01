@@ -2,8 +2,9 @@
 
 An **agentic** shopping app for Claude Desktop. The embedded UI is deliberately
 small — it's just the visual part that benefits from being a widget: browse the
-product grid, pick quantities, and click **Add to cart**. Everything after that
-is driven by **Claude in chat**, not by the iframe.
+product grid and adjust quantities right on each card. Everything else
+(confirming, asking about products, checkout) is driven by **Claude in chat**,
+not by the iframe.
 
 This mirrors how real Claude/Gemini commerce connectors work: the agent builds
 and edits the cart conversationally but **does not place orders or take
@@ -17,10 +18,12 @@ page.
 
 ### The flow
 
-1. **Select** — open the picker, choose products and quantities, click "Add to
-   cart". The picker hands off to Claude.
-2. **Claude confirms** — it acknowledges your picks, shows the cart total, and
-   asks whether you want to add more or check out.
+1. **Select** — open the picker and add products with the per-card stepper. Each
+   card reflects the quantity already in your cart; tapping − down to zero (shown
+   as a 🗑) removes the item. Edits update the shared cart immediately.
+2. **Claude confirms** — after you adjust the cart, Claude acknowledges the
+   change, shows the cart total, and asks whether you want to add more or check
+   out.
 3. **Edit by talking** — ask to add/remove items ("drop the webcam", "make it
    two keyboards"), inspect the cart ("what's in my cart?"), or ask about
    products ("what do people say about the monitor?"). Claude uses tools to
@@ -35,6 +38,29 @@ reflected in the picker's cart badge, and anything you add in the picker shows
 up in chat. The cart is kept in-memory locally (lost on server restart); orders
 carry no server state — they're encoded into the checkout link. The checkout
 page is a mock (no real charge).
+
+## Try the hosted demo
+
+A live instance is already deployed, so you can add it as a custom connector and
+try it **without building or deploying anything**.
+
+**Connector URL:** `https://mcp-apps-nine.vercel.app/mcp`
+
+1. **Claude** (web or desktop): Settings → **Connectors** → **Add custom
+   connector**, paste the URL above, and save. Then ask *"Show me the product
+   picker."* The grid renders inline; add items and adjust quantities on the
+   cards, then click **Checkout** (or ask Claude) to open the mock merchant page.
+2. **ChatGPT**: enable **developer mode**, then add a custom connector/app using
+   the same URL.
+
+Just want to see the UI? Open the standalone browser preview — no host required:
+<https://mcp-apps-nine.vercel.app/mcp-app.html> (loads the sample catalog
+locally; checkout is agent-driven and only works inside an MCP host).
+
+> This is an **authless** demo connector — fine for trying it out, not for
+> production. The cart is demo-global (shared by everyone hitting the same
+> deployment) and resets on redeploys; orders are stateless and the checkout
+> page is a mock (no real charge).
 
 ## Build
 
