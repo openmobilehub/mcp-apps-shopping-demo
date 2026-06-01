@@ -38,14 +38,16 @@ export function registerPasskeyGate(app: Express): void {
     // a bad currency that throws in Intl.NumberFormat. Mirror checkoutResponse's
     // guard so an unsigned, attacker-editable token can't 500 the route.
     try {
-      res.status(200).type("html").send(renderPasskeyPage({ order, orderToken: token }));
+      res.status(200).type("html").send(renderPasskeyPage({ order, orderToken: token, crossDevice: req.query.xdev === "1" }));
     } catch {
       res.status(404).type("html").send("<!doctype html><h1>Order not found</h1>");
     }
   });
 
   app.get("/payment-gate/passkey/options", async (req: Request, res: Response) => {
-    const { options, challengeToken } = await buildRegistrationOptions(originOf(req), gateSecret());
+    const { options, challengeToken } = await buildRegistrationOptions(originOf(req), gateSecret(), {
+      crossDevice: req.query.xdev === "1",
+    });
     res.json({ options, challengeToken });
   });
 

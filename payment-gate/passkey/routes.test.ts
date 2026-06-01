@@ -49,6 +49,20 @@ describe("passkey gate routes", () => {
     expect(res.status).toBe(400);
   });
 
+  it("GET /payment-gate/passkey/options?xdev=1 forces cross-platform attachment (caBLE path)", async () => {
+    const { app } = appWithOrderToken();
+    const res = await request(app).get("/payment-gate/passkey/options?xdev=1");
+    expect(res.status).toBe(200);
+    expect(res.body.options.authenticatorSelection.authenticatorAttachment).toBe("cross-platform");
+  });
+
+  it("GET /payment-gate/passkey?xdev=1 renders the page wired to the xdev options", async () => {
+    const { app, token } = appWithOrderToken();
+    const res = await request(app).get(`/payment-gate/passkey?order=${token}&xdev=1`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("/payment-gate/passkey/options?xdev=1");
+  });
+
   it("serves the @simplewebauthn/browser ESM at the same-origin static path", async () => {
     const { app } = appWithOrderToken();
     const res = await request(app).get("/payment-gate/lib/sw/index.js");

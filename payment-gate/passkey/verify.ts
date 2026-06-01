@@ -13,7 +13,13 @@ const RP_NAME = "Product Picker";
 
 // Build registration options + a signed challenge token. userID is ephemeral —
 // we never persist the credential, so a fresh random user each time is fine.
-export async function buildRegistrationOptions(origin: Origin, secret: string) {
+// crossDevice pins authenticatorAttachment to "cross-platform", which removes the
+// local Touch ID option so the browser goes straight to the phone/QR (caBLE) path.
+export async function buildRegistrationOptions(
+  origin: Origin,
+  secret: string,
+  opts: { crossDevice?: boolean } = {},
+) {
   const { challenge, token } = issueChallenge(secret);
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -21,7 +27,11 @@ export async function buildRegistrationOptions(origin: Origin, secret: string) {
     userName: "product-picker-user",
     challenge: Buffer.from(challenge, "base64url"),
     attestationType: "none",
-    authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "required",
+      ...(opts.crossDevice ? { authenticatorAttachment: "cross-platform" as const } : {}),
+    },
   });
   return { options, challengeToken: token };
 }

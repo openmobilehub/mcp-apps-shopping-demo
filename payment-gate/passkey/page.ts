@@ -11,12 +11,19 @@ function money(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 }
 
-export function renderPasskeyPage(args: { order: Order; orderToken: string }): string {
-  const { order, orderToken } = args;
+export function renderPasskeyPage(args: { order: Order; orderToken: string; crossDevice?: boolean }): string {
+  const { order, orderToken, crossDevice = false } = args;
   const rows = order.lines
     .map((l) => `<tr><td>${escapeHtml(l.name)} <span style="color:#999;">×${l.quantity}</span></td><td class="amt">${money(l.lineTotal, l.currency)}</td></tr>`)
     .join("\n");
   const token = escapeHtml(orderToken);
+  // crossDevice pins the registration to a roaming authenticator, so the browser
+  // skips local Touch ID and shows the QR for a phone (caBLE). The toggle link
+  // flips the mode by adding/removing the xdev param on the same gate URL.
+  const optionsUrl = crossDevice ? "/payment-gate/passkey/options?xdev=1" : "/payment-gate/passkey/options";
+  const toggle = crossDevice
+    ? `<a class="toggle" href="/payment-gate/passkey?order=${token}">← Use this device instead</a>`
+    : `<a class="toggle" href="/payment-gate/passkey?order=${token}&amp;xdev=1">Use my phone instead (scan a QR) →</a>`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -38,6 +45,8 @@ export function renderPasskeyPage(args: { order: Order; orderToken: string }): s
   #receipt { display: none; margin-top: 1.25rem; padding: 1rem 1.1rem; background: #ecfdf3; border-left: 4px solid #0a7f2e; border-radius: 6px; }
   .gate { font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem; padding: 0.15rem 0; }
   .gate.pass { color: #0a7f2e; } .gate.fail { color: #b00020; }
+  a.toggle { display: inline-block; margin-top: 0.75rem; font-size: 0.85rem; color: #1a7f37; text-decoration: none; }
+  a.toggle:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -48,11 +57,13 @@ export function renderPasskeyPage(args: { order: Order; orderToken: string }): s
     <tr class="total"><td>Total · order ${escapeHtml(order.id)}</td><td class="amt">${money(order.total, order.currency)}</td></tr>
   </table>
   <button id="go">Authorize ${money(order.total, order.currency)}</button>
+  <div>${toggle}</div>
   <div id="log"></div>
   <div id="receipt"></div>
   <script type="module">
     import { startRegistration } from "/payment-gate/lib/sw/index.js";
     const ORDER_TOKEN = ${JSON.stringify(token)};
+    const OPTIONS_URL = ${JSON.stringify(optionsUrl)};
     const log = document.getElementById("log");
     const btn = document.getElementById("go");
     const step = (t, c = "") => { const d = document.createElement("div"); d.className = "step " + c; d.textContent = t; log.appendChild(d); };
@@ -60,7 +71,7 @@ export function renderPasskeyPage(args: { order: Order; orderToken: string }): s
       btn.disabled = true;
       try {
         step("→ GET options");
-        const { options, challengeToken } = await fetch("/payment-gate/passkey/options").then((r) => r.json());
+        const { options, challengeToken } = await fetch(OPTIONS_URL).then((r) => r.json());
         step("→ Touch ID / passkey prompt");
         const response = await startRegistration({ optionsJSON: options });
         step("→ verify");

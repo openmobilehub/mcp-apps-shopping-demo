@@ -34,4 +34,16 @@ describe("renderPasskeyPage", () => {
     const html = renderPasskeyPage({ order: evil, orderToken: "T" });
     expect(html).not.toContain("<script>x()</script>");
   });
+
+  it("fetches local options and offers a switch to phone (caBLE) by default", () => {
+    const html = renderPasskeyPage({ order, orderToken: "TOKEN123" });
+    expect(html).toContain('"/payment-gate/passkey/options"');
+    expect(html).toContain("order=TOKEN123&amp;xdev=1");
+  });
+
+  it("in cross-device mode fetches the xdev options and offers a switch back to this device", () => {
+    const html = renderPasskeyPage({ order, orderToken: "TOKEN123", crossDevice: true });
+    expect(html).toContain("/payment-gate/passkey/options?xdev=1");
+    expect(html).toContain('href="/payment-gate/passkey?order=TOKEN123"');
+  });
 });
