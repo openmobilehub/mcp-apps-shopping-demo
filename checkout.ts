@@ -72,7 +72,7 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function renderCheckoutPage(order: Order): string {
+function renderCheckoutPage(order: Order, token: string): string {
   const rows = order.lines
     .map(
       (l) => `<tr>
@@ -96,9 +96,6 @@ function renderCheckoutPage(order: Order): string {
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .total { font-weight: 600; font-size: 16px; }
   .total td { border-bottom: none; padding-top: 16px; }
-  button { margin-top: 24px; width: 100%; padding: 14px; font-size: 15px; font-weight: 600;
-    color: #fff; background: #1a7f37; border: none; border-radius: 8px; cursor: pointer; }
-  button:disabled { background: #8bbf99; cursor: default; }
   .note { color: #888; font-size: 12px; margin-top: 12px; text-align: center; }
 </style>
 </head>
@@ -109,14 +106,12 @@ function renderCheckoutPage(order: Order): string {
     ${rows}
     <tr class="total"><td>Total</td><td class="num">${formatMoney(order.total, order.currency)}</td></tr>
   </table>
-  <button id="place">Place order</button>
-  <div class="note">Demo checkout — no real charge.</div>
-  <script>
-    document.getElementById('place').addEventListener('click', function () {
-      this.disabled = true;
-      this.textContent = 'Order placed ✓ (demo)';
-    });
-  </script>
+  <a id="authorize" href="/payment-gate/passkey?order=${encodeURIComponent(token)}"
+     style="display:block;margin-top:24px;width:100%;padding:14px;font-size:15px;font-weight:600;
+     text-align:center;color:#fff;background:#1a7f37;border-radius:8px;text-decoration:none;box-sizing:border-box;">
+    Authorize payment
+  </a>
+  <div class="note">You'll confirm the exact amount with your device. Demo — no real charge.</div>
 </body>
 </html>`;
 }
@@ -140,7 +135,7 @@ export function checkoutResponse(token: string | undefined): { status: number; h
   // Intl.NumberFormat / escapeHtml. Fall back to 404 so the stdio listener (raw
   // http, no error middleware) returns cleanly instead of hanging the socket.
   try {
-    return { status: 200, html: renderCheckoutPage(order) };
+    return { status: 200, html: renderCheckoutPage(order, token!) };
   } catch {
     return { status: 404, html: renderNotFound() };
   }

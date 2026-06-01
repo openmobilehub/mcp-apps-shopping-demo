@@ -82,7 +82,18 @@ describe("checkoutResponse", () => {
     expect(html).toContain(
       new Intl.NumberFormat("en-US", { style: "currency", currency: a.currency }).format(total),
     );
-    expect(html).toContain("Place order");
+    expect(html).toContain("Authorize payment");
     expect(html).toContain(orderId);
+  });
+});
+
+describe("checkout page authorization affordance", () => {
+  it("renders an Authorize payment link to the passkey gate instead of a mock button", () => {
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO01");
+    const { status, html } = checkoutResponse(encodeOrder(order));
+    expect(status).toBe(200);
+    expect(html).toContain("/payment-gate/passkey?order=");
+    expect(html).toContain("Authorize payment");
+    expect(html).not.toContain("Place order");
   });
 });
