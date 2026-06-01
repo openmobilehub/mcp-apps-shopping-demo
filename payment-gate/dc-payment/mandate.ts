@@ -5,6 +5,7 @@
 // `verified` flag.
 import { randomUUID } from "node:crypto";
 import type { Order } from "../../catalog.js";
+import type { Origin } from "../origin.js";
 import { decodeVpToken, extractTransactionDataHash, inspectAuthBlocks } from "./mdoc.js";
 import { hashTransactionData, decodeTransactionData } from "./txData.js";
 
@@ -91,24 +92,26 @@ export interface GateResult {
   detail: string;
 }
 
-export function runDcGates(mandate: DcMandate): GateResult[] {
+export function runDcGates(mandate: DcMandate, origin: Origin): GateResult[] {
   const ua = mandate.userAuthorization;
   const cart = mandate.cart;
   const results: GateResult[] = [];
 
   // Gate 1 — amount binding: (a) the wallet-signed hash equals SHA-256 of the
-  // transaction_data we sent, (b) that transaction_data's amount + payee match
-  // the cart. Re-derived here; the stored `verified` flag is NOT trusted.
+  // transaction_data we sent, (b) that transaction_data's amount, currency, and
+  // payee match the cart + this RP. Re-derived here; the stored `verified` flag
+  // is NOT trusted.
   const tokenHash = ua.vpToken ? extractTransactionDataHash(ua.vpToken) : null;
   const recomputed = ua.transactionData ? hashTransactionData(ua.transactionData) : null;
   const txd = ua.transactionData ? decodeTransactionData(ua.transactionData) : undefined;
   const hashOk = !!tokenHash && tokenHash === recomputed;
   const amountOk = Number(txd?.payload?.amount) === Number(cart.total);
-  const payeeOk = !!txd?.payload?.payee?.id;
+  const currencyOk = txd?.payload?.currency === cart.currency;
+  const payeeOk = !!txd?.payload?.payee?.id && txd.payload.payee.id === origin.rpID;
   results.push({
     gate: "Amount binding",
-    pass: hashOk && amountOk && payeeOk,
-    detail: `hash ${hashOk ? "✓" : "✗"} (token=${tokenHash}) · amount ${amountOk ? "✓" : "✗"} (${txd?.payload?.amount} vs ${cart.total}) · payee ${payeeOk ? "✓" : "✗"}`,
+    pass: hashOk && amountOk && currencyOk && payeeOk,
+    detail: `hash ${hashOk ? "✓" : "✗"} (token=${tokenHash}) · amount ${amountOk ? "✓" : "✗"} (${txd?.payload?.amount} vs ${cart.total}) · currency ${currencyOk ? "✓" : "✗"} (${txd?.payload?.currency} vs ${cart.currency}) · payee ${payeeOk ? "✓" : "✗"} (${txd?.payload?.payee?.id} vs ${origin.rpID})`,
   });
 
   // Gate 2 — authorization present & structurally valid (issuerAuth + deviceAuth).

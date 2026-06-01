@@ -3,6 +3,7 @@
 // the DC mandate, and run the gates. Ports the /result half of the spike server.
 import * as jose from "jose";
 import type { Order } from "../../catalog.js";
+import type { Origin } from "../origin.js";
 import { openReaderContext } from "./readerContext.js";
 import { extractTransactionDataHash } from "./mdoc.js";
 import { buildDcMandate, runDcGates, type DcMandate, type GateResult } from "./mandate.js";
@@ -19,11 +20,12 @@ export interface DcVerification {
 
 export async function verifyDcPresentation(args: {
   order: Order;
+  origin: Origin;
   result: DcResult;
   readerContextToken: string;
   secret: string;
 }): Promise<DcVerification> {
-  const { order, result, readerContextToken, secret } = args;
+  const { order, origin, result, readerContextToken, secret } = args;
   const ctx = await openReaderContext(readerContextToken, secret);
 
   let data: any = result?.data;
@@ -40,6 +42,6 @@ export async function verifyDcPresentation(args: {
 
   const tokenHash = extractTransactionDataHash(vpStr);
   const mandate = buildDcMandate({ order, vpStr, transactionDataB64: ctx.transactionDataB64, tokenHash });
-  const gates = runDcGates(mandate);
+  const gates = runDcGates(mandate, origin);
   return { mandate, gates };
 }

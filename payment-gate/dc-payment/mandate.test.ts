@@ -30,7 +30,7 @@ describe("buildDcMandate", () => {
 
 describe("runDcGates", () => {
   it("passes all four gates for a consistent mandate", () => {
-    const rs = runDcGates(consistent().mandate);
+    const rs = runDcGates(consistent().mandate, origin);
     expect(rs).toHaveLength(4);
     expect(rs.every((r) => r.pass)).toBe(true);
   });
@@ -38,9 +38,22 @@ describe("runDcGates", () => {
   it("Gate 1 fails when the cart total is tampered", () => {
     const { mandate } = consistent();
     mandate.cart.total = 99999;
-    const rs = runDcGates(mandate);
+    const rs = runDcGates(mandate, origin);
     expect(pass(rs, "Amount binding")).toBe(false);
     expect(pass(rs, "Subject binding")).toBe(true);
+  });
+
+  it("Gate 1 fails when the cart currency is swapped at an equal amount", () => {
+    const { mandate } = consistent();
+    mandate.cart.currency = "EUR";
+    const rs = runDcGates(mandate, origin);
+    expect(pass(rs, "Amount binding")).toBe(false);
+  });
+
+  it("Gate 1 fails when the payee does not match this RP", () => {
+    const { mandate } = consistent();
+    const rs = runDcGates(mandate, { rpID: "evil.example", origin: "https://evil.example" });
+    expect(pass(rs, "Amount binding")).toBe(false);
   });
 
   it("Gate 2 fails when deviceAuth is stripped from the token", () => {
@@ -48,7 +61,7 @@ describe("runDcGates", () => {
     const hashBytes = new Uint8Array(Buffer.from(hashTransactionData(txDataB64), "base64url"));
     const vpStr = buildVpToken({ txHashBytes: hashBytes, omitDeviceAuth: true });
     const mandate = buildDcMandate({ order, vpStr, transactionDataB64: txDataB64, tokenHash: hashTransactionData(txDataB64) });
-    const rs = runDcGates(mandate);
+    const rs = runDcGates(mandate, origin);
     expect(pass(rs, "Authorization present")).toBe(false);
     expect(pass(rs, "Amount binding")).toBe(true);
   });
@@ -58,12 +71,12 @@ describe("runDcGates", () => {
     const hashBytes = new Uint8Array(Buffer.from(hashTransactionData(txDataB64), "base64url"));
     const vpStr = buildVpToken({ txHashBytes: hashBytes, expiry: "2020-01-01" });
     const mandate = buildDcMandate({ order, vpStr, transactionDataB64: txDataB64, tokenHash: hashTransactionData(txDataB64) });
-    expect(pass(runDcGates(mandate), "Credential not expired")).toBe(false);
+    expect(pass(runDcGates(mandate, origin), "Credential not expired")).toBe(false);
   });
 
   it("Gate 4 fails when the subject does not match the disclosed instrument", () => {
     const { mandate } = consistent();
     mandate.subject.credentialId = "pi-DIFFERENT";
-    expect(pass(runDcGates(mandate), "Subject binding")).toBe(false);
+    expect(pass(runDcGates(mandate, origin), "Subject binding")).toBe(false);
   });
 });

@@ -51,7 +51,7 @@ export function registerDcPaymentGate(app: Express): void {
     }
     try {
       const origin = originOf(req);
-      const { mandate, gates } = await verifyDcPresentation({ order, result, readerContextToken, secret: gateSecret() });
+      const { mandate, gates } = await verifyDcPresentation({ order, origin, result, readerContextToken, secret: gateSecret() });
       res.json({ mandate, gates, binding: buildBindingFields(order, origin) });
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });

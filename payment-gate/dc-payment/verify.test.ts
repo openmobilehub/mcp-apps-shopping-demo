@@ -25,19 +25,19 @@ async function setup(opts: { tamperToken?: boolean } = {}) {
 describe("verifyDcPresentation", () => {
   it("decrypts, assembles a mandate, and passes the gates for a matching hash", async () => {
     const { order, readerContextToken, result } = await setup();
-    const { mandate, gates } = await verifyDcPresentation({ order, result, readerContextToken, secret });
+    const { mandate, gates } = await verifyDcPresentation({ order, origin, result, readerContextToken, secret });
     expect(mandate.userAuthorization.verified).toBe(true);
     expect(gates.find((g) => g.gate === "Amount binding")?.pass).toBe(true);
   });
 
   it("marks the amount-binding gate failed when the signed hash does not match", async () => {
     const { order, readerContextToken, result } = await setup({ tamperToken: true });
-    const { gates } = await verifyDcPresentation({ order, result, readerContextToken, secret });
+    const { gates } = await verifyDcPresentation({ order, origin, result, readerContextToken, secret });
     expect(gates.find((g) => g.gate === "Amount binding")?.pass).toBe(false);
   });
 
   it("throws on a reader context sealed under a different secret", async () => {
     const { order, readerContextToken, result } = await setup();
-    await expect(verifyDcPresentation({ order, result, readerContextToken, secret: "wrong" })).rejects.toThrow();
+    await expect(verifyDcPresentation({ order, origin, result, readerContextToken, secret: "wrong" })).rejects.toThrow();
   });
 });
