@@ -36,7 +36,12 @@ export function encodeOrder(order: Order): string {
 export function decodeOrder(token: string): Order | undefined {
   try {
     const order = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as Order;
-    if (!order || typeof order.id !== "string" || !Array.isArray(order.lines)) {
+    if (
+      !order ||
+      typeof order.id !== "string" ||
+      !Array.isArray(order.lines) ||
+      typeof order.currency !== "string"
+    ) {
       return undefined;
     }
     return order;
@@ -119,7 +124,7 @@ function renderNotFound(): string {
 <title>Order not found</title>
 <style>body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;color:#1a1a1a}</style>
 </head><body><h1>Order not found</h1>
-<p>No order matches that link. It may have expired (orders are kept in memory and lost on restart).</p>
+<p>The order link appears to be invalid or malformed.</p>
 </body></html>`;
 }
 
