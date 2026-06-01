@@ -4,6 +4,7 @@ import cors from "cors";
 import type { Express, Request, Response } from "express";
 import { createServer } from "./server.js";
 import { checkoutResponse, setCheckoutBaseUrl } from "./checkout.js";
+import { registerPasskeyGate } from "./payment-gate/passkey/routes.js";
 
 export interface AppOptions {
   publicBaseUrl: string;
@@ -46,6 +47,8 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
       }
     }
   });
+
+  registerPasskeyGate(app);
 
   return app;
 }
