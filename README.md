@@ -48,13 +48,17 @@ page.
 4. **Checkout hand-off** — click **Checkout** in the widget (or ask Claude to
    check out). Claude calls the `checkout` tool, which snapshots the cart into
    an order and returns a link to the mock merchant page. The page opens in your
-   browser; you complete the (simulated) purchase there.
+   browser, where **Authorize payment** runs a real WebAuthn ceremony (Touch ID
+   / passkey) that produces an AP2-shaped Payment Mandate — see
+   [`payment-gate/README.md`](payment-gate/README.md). Nothing is charged.
 
 The UI and the agent share one server-side cart, so anything Claude changes is
 reflected in the picker's cart badge, and anything you add in the picker shows
 up in chat. The cart is kept in-memory locally (lost on server restart); orders
 carry no server state — they're encoded into the checkout link. The checkout
-page is a mock (no real charge).
+page is a mock (no real charge), but the **Authorize payment** step on it is a
+real passkey authorization ceremony — see
+[`payment-gate/README.md`](payment-gate/README.md).
 
 ## Demo
 
