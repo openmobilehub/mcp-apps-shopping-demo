@@ -32,8 +32,9 @@ page.
 
 The UI and the agent share one server-side cart, so anything Claude changes is
 reflected in the picker's cart badge, and anything you add in the picker shows
-up in chat. Orders and the cart are kept in-memory (lost on server restart); the
-checkout page is a mock (no real charge).
+up in chat. The cart is kept in-memory locally (lost on server restart); orders
+carry no server state — they're encoded into the checkout link. The checkout
+page is a mock (no real charge).
 
 ## Build
 
@@ -121,13 +122,65 @@ standalone, otherwise an MCP host).
    - **ChatGPT:** enable developer mode, then add it as a custom connector/app.
 
 This is an **authless** demo connector — fine for a demo, not for production.
-Orders and the cart are in-memory and shared across both hosts hitting the same
-server; they reset on restart.
+The cart is in-memory and shared across both hosts hitting the same server (it
+resets on restart); orders are stateless, encoded into the checkout link.
 
 > **Note:** the ChatGPT side uses a `window.openai` bridge whose exact surface is
 > still evolving. All ChatGPT-specific calls are optional-chained, but the widget
 > behavior should be **verified live in ChatGPT developer mode** — it has not been
 > exhaustively confirmed against the current Apps SDK.
+
+## Deploy to Vercel
+
+The server also runs on Vercel as a single serverless function, which gives you
+a stable HTTPS origin without running a tunnel. `api/index.ts` exports the same
+Express app (`createApp()`), and `vercel.json` rewrites every path to it, so one
+function serves both `/mcp` and `/checkout`.
+
+Serverless functions don't keep module memory between invocations, so the two
+pieces of shared state are handled differently:
+
+- **Cart** — persisted through a `CartStore`. Locally (and in stdio mode) it's an
+  in-memory store with zero dependencies; on Vercel it uses Upstash Redis when
+  the connection env vars are present. Without Redis the cart would appear to
+  reset between requests, so Redis is required for the deployed app to behave.
+- **Orders** — stateless. The `checkout` tool encodes the order into the checkout
+  URL (base64url), so the merchant page reconstructs it from the link with no
+  store at all.
+
+1. **Provision Upstash Redis.** From the project directory:
+
+   ```bash
+   vercel install upstash
+   ```
+
+   This adds the Upstash integration and auto-syncs the connection env vars
+   (`KV_REST_API_URL` / `KV_REST_API_TOKEN`, or the `UPSTASH_REDIS_REST_URL` /
+   `UPSTASH_REDIS_REST_TOKEN` pair) into the project. `selectCartStore` picks the
+   Redis store automatically when it sees them.
+
+2. **Deploy:**
+
+   ```bash
+   vercel deploy --prod
+   ```
+
+   Vercel runs `npm run build` (per `vercel.json`), which bundles the UI into
+   `dist/mcp-app.html` and compiles the server. The UI bundle is shipped with the
+   function via `includeFiles: dist/**`.
+
+3. **No `PUBLIC_BASE_URL` needed.** The checkout link falls back to
+   `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel injects automatically, so the
+   link points at the deployment's own origin. Set `PUBLIC_BASE_URL` only if you
+   want to override it (e.g. a custom domain). `ALLOWED_HOSTS` is optional and
+   off by default.
+
+4. **Add the connector** in Claude (or ChatGPT) using the deployment's `/mcp`
+   URL — `https://YOUR-PROJECT.vercel.app/mcp`.
+
+Like the tunnel setup, this is an **authless** demo connector. The cart lives in
+Redis and is demo-global (shared across everyone hitting the deployment); orders
+carry no server state.
 
 ## Preview in the browser
 
@@ -154,22 +207,32 @@ npx @modelcontextprotocol/inspector node dist/main.js --stdio   # inspect tools/
 
 ## Project layout
 
-- `server.ts` — MCP server + shared server-side cart. Tools: `browse-products`
-  (opens the UI), `add-to-cart` / `set-quantity` / `remove-from-cart` /
-  `get-cart` / `checkout` (model- and UI-callable, linked to the UI so
-  chat-driven edits route back to the open picker), `get-product-details` /
-  `get-product-reviews` (model-only info). `checkout` snapshots the cart into an
-  order and returns `{ orderId, checkoutUrl }`; it does not place the order or
-  take payment. The UI bundle is registered as two resources — the MCP Apps mime
-  for Claude and a `text/html+skybridge` resource for ChatGPT — and tools carry
-  both `ui.resourceUri` and `openai/outputTemplate` meta plus tool `annotations`.
-- `checkout.ts` — in-memory order store + the mock checkout HTML page and its
-  HTTP listener (`startCheckoutHttpServer`, default port `3030`). Exposes
-  `createCheckoutOrder` (used by the `checkout` tool) and `checkoutResponse`
-  (used by both the standalone listener and the HTTP entrypoint's `/checkout`
-  route).
-- `main.ts` — stdio (Claude Desktop) and HTTP entrypoints; starts/mounts the
-  checkout page in both modes
+- `server.ts` — MCP server + shared cart (read/written through `cartStore`).
+  Tools: `browse-products` (opens the UI), `add-to-cart` / `set-quantity` /
+  `remove-from-cart` / `get-cart` / `checkout` (model- and UI-callable, linked to
+  the UI so chat-driven edits route back to the open picker),
+  `get-product-details` / `get-product-reviews` (model-only info). `checkout`
+  snapshots the cart into an order and returns `{ orderId, checkoutUrl }`; it does
+  not place the order or take payment. The UI bundle is registered as two
+  resources — the MCP Apps mime for Claude and a `text/html+skybridge` resource
+  for ChatGPT — and tools carry both `ui.resourceUri` and `openai/outputTemplate`
+  meta plus tool `annotations`.
+- `cartStore.ts` — `CartStore` abstraction for the shared cart. `MemoryCartStore`
+  (in-process, zero deps) for local/stdio use; `RedisCartStore` (Upstash) for
+  serverless. `selectCartStore` picks Redis when the connection env vars are set,
+  else memory.
+- `checkout.ts` — stateless orders + the mock checkout HTML page and its HTTP
+  listener (`startCheckoutHttpServer`, default port `3030`). `createCheckoutOrder`
+  encodes the order into the checkout URL (base64url, via `encodeOrder`);
+  `checkoutResponse` decodes it (`decodeOrder`) to render the page — no order
+  store. Used by both the standalone listener and the `/checkout` route.
+- `app.ts` — `createApp()` builds the Express app serving `/mcp` and `/checkout`
+  from one origin (no `listen()`), reused by both `main.ts` and the Vercel
+  function.
+- `main.ts` — stdio (Claude Desktop) and HTTP entrypoints; calls `createApp()`
+  and listens locally, and starts the checkout listener in stdio mode
+- `api/index.ts` / `vercel.json` — Vercel serverless entrypoint (`export default
+  createApp()`) and config that rewrites all paths to the one function
 - `catalog.ts` — sample products + reviews + `priceCart` / `createOrder` /
   `getProduct` / `getReviews` helpers
 - `src/app.tsx` — React selection UI with a footer Checkout button; one bundle
