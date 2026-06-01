@@ -64,7 +64,10 @@ up in chat. The cart is kept in-memory locally (lost on server restart); orders
 carry no server state — they're encoded into the checkout link. The checkout
 page is a mock (no real charge), but the **Authorize payment** step on it is a
 real passkey authorization ceremony — see
-[`payment-gate/README.md`](payment-gate/README.md).
+[`payment-gate/README.md`](payment-gate/README.md). The cross-device,
+amount-bound variant lives in
+[`payment-gate/dc-payment/`](payment-gate/dc-payment/README.md): the wallet signs
+over the exact cart total via OpenID4VP, carried phone↔desktop over FIDO caBLE.
 
 ## Demo
 
