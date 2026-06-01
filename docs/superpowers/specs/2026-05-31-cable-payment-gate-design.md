@@ -256,10 +256,11 @@ stay flat under `payment-gate/` (no folder-per-rung).
 - **Registration-as-gesture** for the passkey gate (single ceremony, stateless)
   rather than register-then-authenticate; the DC gate is where real amount
   binding lives.
-- **No storage dependency for the gate.** Ephemeral state is carried in
-  `GATE_SECRET`-signed tokens to stay stateless on serverless. (The in-memory
-  global cart Map in `server.ts` remains the only server-side state; the gate
-  adds none.)
+- **No new storage dependency for the gate.** Ephemeral state is carried in
+  `GATE_SECRET`-signed tokens to stay stateless on serverless. (The cart's
+  `CartStore` — `MemoryCartStore` locally, `RedisCartStore` on Vercel, selected
+  by `selectCartStore` in `cartStore.ts` — remains the only server-side state;
+  the gate adds none.)
 - **Port, don't couple.** The mdoc/CBOR decode + verification technique is ported
   from `ucp-agentic-tester` spikes into `dc-payment/`; the plugin is not a runtime
   dependency.
