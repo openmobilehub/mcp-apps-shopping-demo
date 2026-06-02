@@ -318,21 +318,38 @@ export function createServer(): McpServer {
       title: "Checkout",
       description:
         "Hand off to checkout: snapshot the cart into an order and return a checkout link for the user " +
-        "to complete the purchase on the merchant page. Does not place the order or take payment.",
-      inputSchema: {},
+        "to complete the purchase on the merchant page. Does not place the order or take payment. " +
+        "The picker passes the on-screen cart via `items`; called without items, it falls back to the shared cart.",
+      // The widget passes its exact on-screen cart so checkout always matches
+      // what the user sees, even if the shared server cart is briefly out of
+      // sync (e.g. a host that doesn't round-trip widget tool calls reliably).
+      // The order is built purely from these items and carried in the link's
+      // token, so the whole hand-off is independent of cartStore persistence.
+      inputSchema: {
+        items: z
+          .array(z.object({ productId: z.string(), quantity: z.number().int().min(1) }))
+          .optional(),
+      },
       annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
       _meta: UI_META,
     },
-    async (): Promise<CallToolResult> => {
-      const cart = await cartStore.read();
-      if (cart.size === 0) {
+    async ({ items }): Promise<CallToolResult> => {
+      let entries: { productId: string; quantity: number }[];
+      if (items && items.length > 0) {
+        entries = items;
+        // Reconcile the shared cart so later get-cart reads match the order.
+        await cartStore.write(new Map(items.map((i) => [i.productId, i.quantity])));
+      } else {
+        const cart = await cartStore.read();
+        entries = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+      }
+      if (entries.length === 0) {
         return {
           content: [{ type: "text", text: "The cart is empty — add items before checking out." }],
           isError: true,
         };
       }
-      const items = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
-      const { orderId, checkoutUrl } = createCheckoutOrder(items);
+      const { orderId, checkoutUrl } = createCheckoutOrder(entries);
       return {
         structuredContent: { orderId, checkoutUrl },
         content: [{ type: "text", text: JSON.stringify({ orderId, checkoutUrl }) }],

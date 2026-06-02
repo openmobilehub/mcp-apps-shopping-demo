@@ -253,7 +253,10 @@ function HostApp() {
   useEffect(() => () => { if (pollRef.current) pollRef.current.cancelled = true; }, []);
   const checkout = useCallback<CheckoutFn>(async () => {
     if (!appRef.current) return;
-    const result = await appRef.current.callServerTool({ name: "checkout", arguments: {} });
+    // Pass the on-screen cart so the order matches exactly what the user sees,
+    // independent of whether prior set-quantity calls round-tripped to the server.
+    const items = cartRef.current.lines.map((l) => ({ productId: l.id, quantity: l.quantity }));
+    const result = await appRef.current.callServerTool({ name: "checkout", arguments: { items } });
     const parsed = parseJsonContent<{ orderId?: string; checkoutUrl?: string }>(result);
     if (!parsed?.checkoutUrl) return;
     await appRef.current.openLink({ url: parsed.checkoutUrl });
@@ -319,7 +322,9 @@ function ChatGptApp() {
   const pollRef = useRef<{ cancelled: boolean } | null>(null);
   useEffect(() => () => { if (pollRef.current) pollRef.current.cancelled = true; }, []);
   const checkout = useCallback<CheckoutFn>(async () => {
-    const result = await oai.callTool?.("checkout", {});
+    // Pass the on-screen cart so the order matches exactly what the user sees.
+    const items = cart.lines.map((l) => ({ productId: l.id, quantity: l.quantity }));
+    const result = await oai.callTool?.("checkout", { items });
     const parsed = structuredOf(result) as { orderId?: string; checkoutUrl?: string } | undefined;
     if (!parsed?.checkoutUrl) return;
     await oai.openExternal?.({ href: parsed.checkoutUrl });
@@ -332,7 +337,7 @@ function ChatGptApp() {
     oai.sendFollowUpMessage?.({ prompt: purchaseCompleteMessage(order) });
     const refreshed = await oai.callTool?.("get-cart", {});
     applyToolOutput(structuredOf(refreshed));
-  }, [oai, applyToolOutput]);
+  }, [oai, applyToolOutput, cart]);
 
   return <Picker products={products} cart={cart} setQuantity={setQuantity} checkout={checkout} />;
 }
