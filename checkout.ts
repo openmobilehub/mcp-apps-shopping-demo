@@ -111,7 +111,7 @@ function renderCheckoutPage(order: Order, token: string): string {
   <a id="authorize" href="/payment-gate/passkey?order=${encodeURIComponent(token)}"
      style="display:block;margin-top:24px;width:100%;padding:14px;font-size:15px;font-weight:600;
      text-align:center;color:#fff;background:#1a7f37;border-radius:8px;text-decoration:none;box-sizing:border-box;">
-    Authorize payment
+    Authorize payment with a passkey
   </a>
   <a id="authorize-xdev" href="/payment-gate/dc-payment?order=${encodeURIComponent(token)}"
      style="display:block;margin-top:10px;width:100%;padding:12px;font-size:14px;font-weight:500;
