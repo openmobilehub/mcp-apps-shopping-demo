@@ -161,12 +161,9 @@ export function createServer(): McpServer {
               `2. Adjust the cart by id with add-to-cart, set-quantity, and remove-from-cart; read it with get-cart.\n` +
               `3. To check out, call checkout to get a checkout link and share it with the user — do not try to ` +
               `pay or confirm the order yourself.\n` +
-              `4. The user completes the purchase themselves on that page. get-order-status is a read-only check of ` +
-              `whether their order has gone through; you may call it (with the orderId from checkout) to learn when ` +
-              `to relay the result. It returns once the order is recorded, or after a short wait so you can check ` +
-              `again. You are only observing and reporting status — not placing the order or taking payment. When it ` +
-              `reports a completed order, let the user know: the order ID, the total, and that their items are on the ` +
-              `way. A cleared cart (get-cart empty) is a second signal it completed.\n` +
+              `4. The user completes the purchase themselves on that page; the widget will tell you when it's done. ` +
+              `When the user (or the widget) indicates the purchase completed, call get-order-status to fetch the ` +
+              `details and confirm to the user: the order ID, the total, and that their items are on the way.\n` +
               `Use get-product-details and get-product-reviews to answer questions about items.`,
           },
         ],
@@ -338,17 +335,7 @@ export function createServer(): McpServer {
       const { orderId, checkoutUrl } = createCheckoutOrder(items);
       return {
         structuredContent: { orderId, checkoutUrl },
-        content: [
-          { type: "text", text: JSON.stringify({ orderId, checkoutUrl }) },
-          {
-            type: "text",
-            text:
-              `Share this checkout link with the user — they complete the purchase themselves on that page. ` +
-              `To know when it's done so you can relay the result, you may call get-order-status with orderId ` +
-              `"${orderId}": it's a read-only status check that returns once their order is recorded (or after a ` +
-              `short wait, so you can check again). You are not placing the order or taking payment — only reporting status.`,
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify({ orderId, checkoutUrl }) }],
       };
     },
   );
@@ -363,39 +350,21 @@ export function createServer(): McpServer {
     {
       title: "Get Order Status",
       description:
-        "Read-only check of whether the user has completed their purchase on the checkout/payment page. The user " +
-        "initiates and completes checkout themselves; this tool only reports status. Pass the orderId returned by " +
-        "checkout to check that specific order: it returns the order once it's recorded — order ID, amount, " +
-        "currency, payment instrument, and the authorization gate results — or, after a short wait (~25s), a note " +
-        "that it isn't complete yet so you can check again. Use it to know when to relay the result back to the " +
-        "user (order ID, total, items on the way). With no orderId, returns the most recent completed order if any.",
-      inputSchema: {
-        orderId: z.string().optional(),
-        waitMs: z.number().int().min(0).max(50_000).optional(),
-      },
+        "Read-only check of the user's most recent completed purchase. The user initiates and completes checkout " +
+        "themselves; this tool only reports status. Returns the completed order — order ID, amount, currency, " +
+        "payment instrument, and the authorization gate results — or a note that none is complete yet. Call it once " +
+        "the user (or the widget) says the purchase finished, then confirm the order ID and total to the user and " +
+        "tell them their items are on the way. Pass orderId to require a specific order.",
+      inputSchema: { orderId: z.string().optional() },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ orderId, waitMs }): Promise<CallToolResult> => {
-      const matches = (o: Awaited<ReturnType<typeof orderStore.read>>) =>
-        !!o && (!orderId || o.orderId === orderId);
-      const deadline = Date.now() + Math.min(waitMs ?? 25_000, 50_000);
-      let order = await orderStore.read();
-      // Long-poll: the checkout hand-off completes on a page outside the agent and
-      // MCP has no server->client push, so block here until the order is recorded
-      // (or we time out and the agent re-calls to keep watching).
-      while (!matches(order) && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 1_500));
-        order = await orderStore.read();
-      }
-      if (!matches(order)) {
+    async ({ orderId }): Promise<CallToolResult> => {
+      const order = await orderStore.read();
+      const matches = !!order && (!orderId || order.orderId === orderId);
+      if (!matches) {
         return {
           content: [
-            {
-              type: "text",
-              text: orderId
-                ? `Order ${orderId} is not complete yet — the user is still authorizing on the checkout page. Call get-order-status again with the same orderId to keep watching.`
-                : "No completed purchase yet — the user hasn't finished authorizing on the checkout page.",
-            },
+            { type: "text", text: "No completed purchase yet — the user hasn't finished authorizing on the checkout page." },
           ],
         };
       }

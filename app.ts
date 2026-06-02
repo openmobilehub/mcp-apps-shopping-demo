@@ -4,6 +4,7 @@ import cors from "cors";
 import type { Express, Request, Response } from "express";
 import { createServer } from "./server.js";
 import { checkoutResponse, setCheckoutBaseUrl } from "./checkout.js";
+import { orderStore } from "./orderStore.js";
 import { registerPasskeyGate } from "./payment-gate/passkey/routes.js";
 import { registerDcPaymentGate } from "./payment-gate/dc-payment/routes.js";
 
@@ -22,6 +23,17 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
     const order = typeof req.query.order === "string" ? req.query.order : undefined;
     const { status, html } = checkoutResponse(order);
     res.status(status).type("html").send(html);
+  });
+
+  // Same-origin completion poll for the embedded widget. The payment gate writes
+  // the order to the shared store; the widget polls this after handing off and,
+  // on completion, injects a user-turn message so the agent confirms in chat.
+  // Read-only — the agent never drives this; the browser does.
+  app.get("/checkout/order-status", async (req: Request, res: Response) => {
+    const orderId = typeof req.query.orderId === "string" ? req.query.orderId : undefined;
+    const order = await orderStore.read();
+    const completed = !!order && (!orderId || order.orderId === orderId);
+    res.json({ completed, order: completed ? order : null });
   });
 
   app.all("/mcp", async (req: Request, res: Response) => {
