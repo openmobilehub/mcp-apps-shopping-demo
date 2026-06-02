@@ -161,11 +161,12 @@ export function createServer(): McpServer {
               `2. Adjust the cart by id with add-to-cart, set-quantity, and remove-from-cart; read it with get-cart.\n` +
               `3. To check out, call checkout to get a checkout link and share it with the user — do not try to ` +
               `pay or confirm the order yourself.\n` +
-              `4. Immediately after sharing the link, start watching for completion: call get-order-status with the ` +
-              `orderId from checkout. It long-polls until the user finishes authorizing on the page. If it returns ` +
-              `"not complete yet", call it again with the same orderId — keep watching; do NOT wait for the user to ` +
-              `say they paid. When it returns a completed order, confirm it: state the order ID and the total amount ` +
-              `charged, and tell them their items are on the way. A cleared cart (get-cart empty) is a second signal.\n` +
+              `4. The user completes the purchase themselves on that page. get-order-status is a read-only check of ` +
+              `whether their order has gone through; you may call it (with the orderId from checkout) to learn when ` +
+              `to relay the result. It returns once the order is recorded, or after a short wait so you can check ` +
+              `again. You are only observing and reporting status — not placing the order or taking payment. When it ` +
+              `reports a completed order, let the user know: the order ID, the total, and that their items are on the ` +
+              `way. A cleared cart (get-cart empty) is a second signal it completed.\n` +
               `Use get-product-details and get-product-reviews to answer questions about items.`,
           },
         ],
@@ -342,9 +343,10 @@ export function createServer(): McpServer {
           {
             type: "text",
             text:
-              `Share ${checkoutUrl} with the user, then immediately call get-order-status with orderId "${orderId}" ` +
-              `to start watching for completion — it waits for the user to finish on the page. If it returns "not ` +
-              `complete yet", call it again with the same orderId. Do not wait for the user to say they paid.`,
+              `Share this checkout link with the user — they complete the purchase themselves on that page. ` +
+              `To know when it's done so you can relay the result, you may call get-order-status with orderId ` +
+              `"${orderId}": it's a read-only status check that returns once their order is recorded (or after a ` +
+              `short wait, so you can check again). You are not placing the order or taking payment — only reporting status.`,
           },
         ],
       };
@@ -361,12 +363,12 @@ export function createServer(): McpServer {
     {
       title: "Get Order Status",
       description:
-        "Watch for the user to complete a purchase on the checkout/payment page. Pass the orderId returned by " +
-        "checkout to watch that specific order: this tool waits (long-polls, up to ~25s) until that order is " +
-        "authorized, then returns it — order ID, amount, currency, payment instrument, and the authorization gate " +
-        "results. If it returns 'still waiting', the user hasn't finished; call it again with the same orderId to " +
-        "keep watching. On completion, confirm the order ID and total to the user and tell them their items are on " +
-        "the way. Called with no orderId, it returns the most recent completed order (or a note that none exists).",
+        "Read-only check of whether the user has completed their purchase on the checkout/payment page. The user " +
+        "initiates and completes checkout themselves; this tool only reports status. Pass the orderId returned by " +
+        "checkout to check that specific order: it returns the order once it's recorded — order ID, amount, " +
+        "currency, payment instrument, and the authorization gate results — or, after a short wait (~25s), a note " +
+        "that it isn't complete yet so you can check again. Use it to know when to relay the result back to the " +
+        "user (order ID, total, items on the way). With no orderId, returns the most recent completed order if any.",
       inputSchema: {
         orderId: z.string().optional(),
         waitMs: z.number().int().min(0).max(50_000).optional(),
