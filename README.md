@@ -3,15 +3,15 @@
 <table>
 <tr>
 <td align="center" width="33%">
-<a href="https://youtube.com/shorts/YiNzjIVcGOA">
-<img src="https://img.youtube.com/vi/YiNzjIVcGOA/hqdefault.jpg" width="280" alt="Demo: Product Picker in the Claude native app"><br>
-▶︎ Claude native app
+<a href="https://youtube.com/shorts/JA91c2d2DhQ">
+<img src="https://img.youtube.com/vi/JA91c2d2DhQ/hqdefault.jpg" width="280" alt="Demo: Product Picker in the Claude native app, with Digital Payment Credentials and AP2 checkout"><br>
+▶︎ Claude + AP2 checkout
 </a>
 </td>
 <td align="center" width="33%">
-<a href="https://youtube.com/shorts/M-Vw3rCxNK0">
-<img src="https://img.youtube.com/vi/M-Vw3rCxNK0/hqdefault.jpg" width="280" alt="Demo: Product Picker in ChatGPT"><br>
-▶︎ ChatGPT
+<a href="https://youtube.com/shorts/8rMx5P1AOgI">
+<img src="https://img.youtube.com/vi/8rMx5P1AOgI/hqdefault.jpg" width="280" alt="Demo: Product Picker in ChatGPT, with Digital Payment Credentials and AP2 checkout"><br>
+▶︎ ChatGPT + AP2 checkout
 </a>
 </td>
 <td align="center" width="33%">
@@ -71,10 +71,11 @@ over the exact cart total via OpenID4VP, carried phone↔desktop over FIDO caBLE
 
 ## Demo
 
-See it running end to end (browse → edit cart → checkout hand-off):
+See it running end to end (browse → edit cart → checkout with Digital Payment
+Credentials → AP2 Payment Mandate):
 
-- **Claude native app:** <https://youtube.com/shorts/YiNzjIVcGOA>
-- **ChatGPT:** <https://youtube.com/shorts/M-Vw3rCxNK0>
+- **Claude native app:** <https://youtube.com/shorts/JA91c2d2DhQ>
+- **ChatGPT:** <https://youtube.com/shorts/8rMx5P1AOgI>
 - **Claude desktop (claude.ai):** <https://youtu.be/MDlyOMIAgYg>
 
 ## Try the hosted demo
