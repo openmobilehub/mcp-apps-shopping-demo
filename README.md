@@ -15,13 +15,19 @@
 </a>
 </td>
 <td align="center" width="33%">
+<a href="https://youtu.be/MDlyOMIAgYg">
+<img src="https://img.youtube.com/vi/MDlyOMIAgYg/hqdefault.jpg" width="280" alt="Demo: Product Picker in Claude desktop (claude.ai)"><br>
+▶︎ Claude desktop (claude.ai)
+</a>
+</td>
+</tr>
+<tr>
+<td align="center" width="33%">
 <a href="https://youtu.be/qAXgxuihbA8">
 <img src="https://img.youtube.com/vi/qAXgxuihbA8/hqdefault.jpg" width="280" alt="Demo: Utopia Marketplace in Goose, with passkey payment authorization"><br>
 ▶︎ Goose + passkey checkout
 </a>
 </td>
-</tr>
-<tr>
 <td align="center" width="33%">
 <a href="https://youtu.be/5MXRkNJF824">
 <img src="https://img.youtube.com/vi/5MXRkNJF824/hqdefault.jpg" width="280" alt="Demo: Product Picker in Claude Code (terminal), with passkey payment authorization"><br>
@@ -83,6 +89,7 @@ See it running end to end (browse → edit cart → checkout hand-off):
 - **Claude native app:** <https://youtube.com/shorts/JA91c2d2DhQ>
 - **ChatGPT:** <https://youtube.com/shorts/8rMx5P1AOgI>
 - **Claude desktop (claude.ai):** <https://youtu.be/MDlyOMIAgYg>
+- **Goose — passkey checkout:** <https://youtu.be/qAXgxuihbA8>
 - **Claude Code (terminal) — passkey checkout:** <https://youtu.be/5MXRkNJF824>
 - **Claude Code (terminal) — Digital Payment Credentials + AP2:** <https://youtu.be/GmYu-4M5unY>
 
