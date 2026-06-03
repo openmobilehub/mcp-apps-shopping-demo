@@ -191,3 +191,32 @@ claude mcp add --transport http product-picker https://mcp-apps-nine.vercel.app/
 Source: https://github.com/dzuluaga/mcp-apps-shopping-demo
 
 #ClaudeCode #MCP #AP2 #DigitalCredentials #OpenID4VP #AgenticCommerce #FIDO #AIAgents #Anthropic
+
+## Custom connectors compared — Claude & ChatGPT vs Copilot & Gemini
+
+### Title
+Which AI Assistants Let You Add Custom Connectors? Claude & ChatGPT vs Copilot & Gemini
+
+### Description
+I tried adding the same custom MCP connector to four AI assistants side by side: Claude, ChatGPT, Microsoft Copilot, and Gemini. The difference is clear. Claude and ChatGPT both let you bring your own custom Connector / MCP App. You paste a URL and the app loads right inside the chat. Microsoft Copilot and Gemini do not allow it yet, there is no way to add your own connector.
+
+What I am adding is Utopia Marketplace, an agentic shopping MCP App. It is one MCP server that runs across surfaces. The product grid renders inside the assistant, you adjust quantities on each card, and the agent handles the cart conversationally. Checkout hands off to a mock merchant page where payment is authorized with a passkey or a Digital Payment Credential (AP2), so the agent never takes payment itself. No real charges, it is a demo.
+
+Why it matters: letting developers run their own MCP Apps opens the door to real third party innovation. And openness does not have to be a free for all. Platforms can still run a developer program to vet and approve third party apps, the same way mobile app stores do. Open to build, reviewed to ship.
+
+In this clip:
+• Adding a custom connector in Claude and ChatGPT (supported)
+• Microsoft Copilot and Gemini have no option to add one
+• Utopia Marketplace rendering products inside the assistant
+• Conversational cart, with checkout handed off to a mock merchant page
+
+Try it yourself, add this custom connector URL:
+https://mcp-apps-nine.vercel.app/mcp
+
+See it running:
+• Claude: https://youtube.com/shorts/JA91c2d2DhQ
+• ChatGPT: https://youtube.com/shorts/8rMx5P1AOgI
+
+Source: https://github.com/dzuluaga/mcp-apps-shopping-demo
+
+#Claude #ChatGPT #MCP #ModelContextProtocol #AIAgents #Copilot #Gemini #AgenticAI #CustomConnectors #Anthropic #OpenAI

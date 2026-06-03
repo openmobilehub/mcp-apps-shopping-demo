@@ -41,6 +41,14 @@
 </a>
 </td>
 </tr>
+<tr>
+<td align="center" width="33%">
+<a href="https://youtu.be/5x47CO54wvI">
+<img src="https://img.youtube.com/vi/5x47CO54wvI/hqdefault.jpg" width="280" alt="Which AI assistants let you add custom connectors: Claude and ChatGPT vs Copilot and Gemini"><br>
+▶︎ Custom connectors: Claude & ChatGPT vs Copilot & Gemini
+</a>
+</td>
+</tr>
 </table>
 
 An **agentic** shopping app built as **one MCP server that runs on every
@@ -108,6 +116,7 @@ Credentials → AP2 Payment Mandate):
 - **Goose — passkey checkout:** <https://youtu.be/qAXgxuihbA8>
 - **Claude Code (terminal) — passkey checkout:** <https://youtu.be/5MXRkNJF824>
 - **Claude Code (terminal) — Digital Payment Credentials + AP2:** <https://youtu.be/GmYu-4M5unY>
+- **Custom connectors compared (Claude & ChatGPT vs Copilot & Gemini):** <https://youtu.be/5x47CO54wvI>
 
 ## Try the hosted demo
 
