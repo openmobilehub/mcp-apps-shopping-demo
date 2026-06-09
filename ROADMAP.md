@@ -32,3 +32,29 @@ Planned work for the Product Picker MCP app. Status reflects intent, not a commi
   - [ ] **Claude Code terminal**
 - [ ] **Update R… (TBD).** Placeholder for an item that was truncated in chat
   ("Update R" — likely README or the router). Confirm scope before starting.
+
+## Later / exploring (not built — do not claim as a capability)
+
+- [ ] **UCP checkout adapter (Topology A).** Make this server an MCP *client* to a
+  real merchant Checkout MCP while it stays the agent-facing server, so the AP2
+  mandate gate wraps the merchant's `complete_checkout` as the UCP **AP2 Mandates
+  Extension**. Until it is implemented and conformance-tested, we cannot claim
+  "UCP-compatible" — this is direction, not a feature.
+  - Factor the merchant half of `checkout.ts` behind a `CheckoutBackend` interface
+    (`createCheckout` / `getCheckout` / `completeCheckout` / `cancelCheckout`).
+    `LocalMockBackend` = today's `encodeOrder`/`checkoutResponse` path (unchanged);
+    `UcpCheckoutAdapter` = MCP client negotiating `dev.ucp.shopping.checkout` via
+    `meta["ucp-agent"].profile`.
+  - Gates (`payment-gate/mandate.ts`, 4 checks) run **before** the merchant call;
+    the signed mandate rides as the UCP AP2 Mandates Extension payload (`meta`).
+  - Amount binding: adapter reconciles the merchant's checkout total against
+    `order.total` before building the mandate; Gate 1 + `dc-payment/txData.ts`
+    already re-derive amount, so the merchant figure must match or we refuse.
+  - Origin/RP-ID unchanged — the WebAuthn/OpenID4VP ceremony stays against this
+    server's origin; the UCP merchant is a downstream relying party.
+  - Open cut → `Universal-Commerce-Protocol/samples` (no merchant account,
+    clone-and-run). Live cut → Shopify Checkout MCP (`/api/ucp/mcp`, JWT auth,
+    `requires_escalation`). Same `CheckoutBackend`, switched by config.
+  - The "UCP-compatible" claim is earned only by passing the official Apache-2.0
+    `Universal-Commerce-Protocol/conformance` suite against `/.well-known/ucp` +
+    the `dev.ucp.shopping.checkout` profile. No conformance pass → no claim.
