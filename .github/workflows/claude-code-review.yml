@@ -1,0 +1,70 @@
+name: Claude Code Review
+
+# Automated first-pass review on every PR.
+# Auth: runs on a Claude subscription via CLAUDE_CODE_OAUTH_TOKEN (no metered API key).
+#   Generate the token locally with `claude setup-token` and add it as the repo secret
+#   CLAUDE_CODE_OAUTH_TOKEN (Settings -> Secrets and variables -> Actions).
+# To switch to org/corporate auth later, replace `claude_code_oauth_token` with either
+#   `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` (org Console key), or
+#   OIDC federation (`anthropic_federation_rule_id` + `anthropic_organization_id`, plus
+#   `id-token: write` below) — no static secret.
+
+on:
+  pull_request:
+    # `synchronize` re-reviews on every push (handy while testing). Drop it to
+    # `[opened, reopened]` once you want to minimize per-PR cost.
+    types: [opened, synchronize, reopened]
+
+# Least privilege: read the code, write review comments. (id-token only needed for OIDC auth.)
+permissions:
+  contents: read
+  pull-requests: write
+
+# One review per PR; a new push cancels an in-flight run to save usage.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Skip drafts and bot PRs.
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Sonnet for the cheap always-on pass; reserve Opus for on-demand deep reviews.
+          claude_args: "--model claude-sonnet-4-6 --max-turns 25"
+          prompt: |
+            Review this pull request as an adversarial reviewer for an agentic-commerce
+            MCP server. Read CLAUDE.md first — it lists the security invariants this repo
+            must uphold. For each change, try to break it, then verify each finding against
+            the actual code before reporting it (no speculation).
+
+            Focus, in priority order:
+            1. SAFETY/AUTH GATE BYPASS — any age/payment/auth gate must be enforced
+               SERVER-SIDE on EVERY completion path (POST /checkout/place-order, the
+               passkey and dc-payment /verify handlers, and the MCP `checkout` tool),
+               not merely hidden in rendered HTML. Order tokens are unsigned and
+               hand-editable: never trust amounts or flags carried in the token.
+            2. AMOUNT / STATE INTEGRITY — discounts and totals must reconcile with the
+               payment gate's amount re-derivation (line sum, total, and signed amount
+               must agree). Verification/cart state must be scoped per session/order,
+               never process-global (cross-user bleed).
+            3. CREDENTIAL CHECKS — require explicit positive claims (e.g. age_over_21===true),
+               not "any token present"; thresholds must match the product restriction.
+            4. INTEGRATION REGRESSIONS in shared modules (payment-gate/*, checkout.ts, server.ts).
+            5. TEST QUALITY — do tests exercise the security-critical/bypass paths, or only
+               happy-path shape?
+
+            Post a single PR review: a short summary, a clear recommendation
+            (approve / approve-with-nits / request-changes), then findings grouped as
+            Blocking / Non-blocking / Nits, each with file:line and a concrete fix.
+            Also note what the PR does well. Be concise and high-signal.
