@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --ink:#0f172a; --muted:#64748b;
+    --blue:#2563eb; --blueBg:#eff4ff; --blueBd:#bcd0ff;
+    --violet:#7c3aed; --violetBg:#f5f0ff; --violetBd:#d9c8ff;
+    --green:#15803d; --greenBg:#eafaf0; --greenBd:#aee6c2;
+    --amber:#b45309; --amberBg:#fff7e6; --amberBd:#f5d98a;
+    --teal:#0e7490; --tealBg:#e6f7fb; --tealBd:#a8e0ec;
+    --red:#b91c1c;
+  }
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:#ffffff; color:var(--ink);
+    width:1480px; padding:44px 52px 52px;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1{ font-size:30px; font-weight:800; letter-spacing:-0.4px; }
+  h1 .np{ color:var(--violet); }
+  .sub{ font-size:15px; color:var(--muted); margin-top:6px; font-weight:500; }
+
+  .phase{ border-radius:18px; padding:22px 24px 26px; margin-top:24px; position:relative; }
+  .phase.p1{ background:var(--blueBg); border:1.5px solid var(--blueBd); }
+  .phase.p2{ background:var(--violetBg); border:1.5px solid var(--violetBd); }
+  .ptag{ display:inline-flex; align-items:center; gap:9px; font-size:13px; font-weight:800;
+         letter-spacing:.5px; text-transform:uppercase; margin-bottom:18px; }
+  .ptag.t1{ color:var(--blue); }
+  .ptag.t2{ color:var(--violet); }
+  .ptag .pill{ font-size:11px; font-weight:700; text-transform:none; letter-spacing:0;
+               padding:3px 10px; border-radius:999px; background:#fff; }
+  .ptag.t1 .pill{ border:1px solid var(--blueBd); color:var(--blue); }
+  .ptag.t2 .pill{ border:1px solid var(--violetBd); color:var(--violet); }
+
+  .row{ display:flex; align-items:stretch; gap:0; }
+  .node{ flex:1; background:#fff; border-radius:13px; padding:14px 12px;
+         display:flex; flex-direction:column; justify-content:center; align-items:center;
+         text-align:center; box-shadow:0 1px 2px rgba(15,23,42,.06), 0 3px 10px rgba(15,23,42,.05);
+         border:1.5px solid #e7ecf3; min-height:92px; }
+  .node .ic{ font-size:18px; line-height:1; margin-bottom:6px; }
+  .node .nm{ font-size:14px; font-weight:700; line-height:1.25; }
+  .node .meta{ font-size:11px; color:var(--muted); margin-top:4px; line-height:1.3; font-weight:500; }
+  .node.accentBlue{ border-color:var(--blueBd); }
+  .node.accentViolet{ border-color:var(--violetBd); }
+  .node.accentAmber{ border-color:var(--amberBd); background:var(--amberBg); }
+  .node.accentGreen{ border-color:var(--greenBd); background:var(--greenBg); }
+  .node.accentTeal{ border-color:var(--tealBd); background:var(--tealBg); }
+
+  .arr{ flex:0 0 58px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
+  .arr .lbl{ font-size:10.5px; font-weight:700; color:#475569; white-space:nowrap; }
+  .arr svg{ display:block; }
+
+  /* merchant-agent fan-out */
+  .fan{ flex:1.35; display:flex; flex-direction:column; gap:10px; justify-content:center; }
+  .fan .cap{ font-size:10.5px; font-weight:700; color:var(--teal); text-align:center; margin-bottom:1px; }
+  .fan .node{ min-height:60px; }
+
+  .gate{ flex:0 0 142px; align-self:center; }
+  .diamond{ width:142px; height:100px; position:relative; display:flex; align-items:center; justify-content:center; }
+  .diamond .sh{ position:absolute; inset:0; background:var(--amberBg); border:1.5px solid var(--amberBd);
+                transform:rotate(45deg); border-radius:14px; box-shadow:0 3px 10px rgba(15,23,42,.05); }
+  .diamond .tx{ position:relative; text-align:center; font-size:12px; font-weight:800; color:var(--amber); line-height:1.2; }
+  .diamond .tx small{ display:block; font-weight:600; color:#92600a; font-size:10.5px; margin-top:2px; }
+
+  .settle{ margin-top:18px; display:flex; align-items:center; gap:18px; }
+  .settleBox{ flex:1; background:var(--greenBg); border:1.5px solid var(--greenBd); border-radius:13px;
+              padding:16px 20px; box-shadow:0 3px 10px rgba(15,23,42,.05); }
+  .settleBox .hd{ display:flex; align-items:center; gap:8px; font-size:15px; font-weight:800; color:var(--green); }
+  .settleBox ul{ list-style:none; margin-top:9px; display:flex; gap:24px; flex-wrap:wrap; }
+  .settleBox li{ font-size:12.5px; color:#1f3d2b; font-weight:600; display:flex; align-items:center; gap:7px; }
+  .settleBox li b{ color:var(--green); }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--green); flex:0 0 auto; }
+
+  .branch{ flex:0 0 158px; display:flex; flex-direction:column; gap:9px; }
+  .branchRow{ display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; }
+  .branchRow.pass{ color:var(--green); }
+  .branchRow.fail{ color:var(--red); }
+  .branchRow .tag{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; }
+  .branchRow.pass .tag{ background:#dcf5e6; color:var(--green); }
+  .branchRow.fail .tag{ background:#fde4e4; color:var(--red); }
+
+  .crosslink{ display:flex; align-items:center; gap:9px; margin:2px 0 16px; font-size:12px;
+              color:var(--violet); font-weight:700; }
+  .crosslink .dash{ flex:0 0 26px; border-top:2px dashed var(--violet); height:0; }
+  .footnote{ margin-top:16px; font-size:12px; color:var(--muted); display:flex; gap:18px; flex-wrap:wrap; }
+  .footnote span b{ color:var(--ink); }
+</style>
+</head>
+<body>
+  <h1>Delegated A2A Purchase — Human <span class="np">Not Present</span></h1>
+  <div class="sub">Buyer agent negotiates with merchant agents and pays under a single human-signed Intent Mandate.</div>
+
+  <!-- PHASE 1 -->
+  <div class="phase p1">
+    <div class="ptag t1">Phase 1 — Delegation <span class="pill">human present · happens once</span></div>
+    <div class="row">
+      <div class="node accentBlue"><div class="ic">🧑</div><div class="nm">User</div></div>
+      <div class="arr"><span class="lbl">watch deal</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentViolet"><div class="ic">💬</div><div class="nm">Claude Desktop</div><div class="meta">agent host</div></div>
+      <div class="arr"><span class="lbl">delegate</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentAmber"><div class="ic">🛠️</div><div class="nm">MCP server</div><div class="meta">delegate_purchase()</div></div>
+      <div class="arr"><span class="lbl">sign</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentAmber"><div class="ic">🔐</div><div class="nm">Sign INTENT Mandate</div><div class="meta">DC API / caBLE · hardware-backed</div></div>
+      <div class="arr"><span class="lbl">store</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentGreen"><div class="ic">🗄️</div><div class="nm">OrderStore</div><div class="meta">Upstash · watch + mandate, keyed by watchId</div></div>
+    </div>
+  </div>
+
+  <div class="crosslink"><span class="dash"></span>later — Vercel Cron fires (or user calls check_watches); loop carries only the watchId, re-loads the mandate each wake</div>
+
+  <!-- PHASE 2 -->
+  <div class="phase p2">
+    <div class="ptag t2">Phase 2 — Agent-to-Agent Execution <span class="pill">human NOT present · runs on your infra</span></div>
+    <div class="row">
+      <div class="node accentAmber"><div class="ic">⏰</div><div class="nm">Trigger</div><div class="meta">Cron / check_watches</div></div>
+      <div class="arr"><span class="lbl">wake</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentViolet"><div class="ic">🤖</div><div class="nm">Buyer agent</div><div class="meta">loads Intent by watchId</div></div>
+      <div class="arr"><span class="lbl">ask: quote</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#0e7490" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#0e7490"/></svg></div>
+      <div class="fan">
+        <div class="cap">discover via agent card · A2A / MCP</div>
+        <div class="node accentTeal"><div class="ic">🛒</div><div class="nm">Walmart agent</div><div class="meta">returns cart + price</div></div>
+        <div class="node accentTeal"><div class="ic">🛒</div><div class="nm">Costco agent</div><div class="meta">returns cart + price</div></div>
+      </div>
+      <div class="arr"><span class="lbl">carts</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#0e7490" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#0e7490"/></svg></div>
+      <div class="node accentBlue"><div class="ic">⚖️</div><div class="nm">Compare &amp; select</div><div class="meta">cheapest cart ⊆ Intent</div></div>
+      <div class="arr"><span class="lbl">bind</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="node accentViolet"><div class="ic">🧾</div><div class="nm">Bind PAYMENT mandate</div><div class="meta">to winning merchant's cart</div></div>
+      <div class="arr"><span class="lbl">check</span>
+        <svg width="50" height="12"><line x1="0" y1="6" x2="40" y2="6" stroke="#94a3b8" stroke-width="2"/><polygon points="40,1 50,6 40,11" fill="#94a3b8"/></svg></div>
+      <div class="gate"><div class="diamond"><div class="sh"></div><div class="tx">Policy Gate<small>Cart ⊆ Intent</small></div></div></div>
+      <div class="branch">
+        <div class="branchRow pass"><span class="tag">pass</span>
+          <svg width="30" height="12"><line x1="0" y1="6" x2="20" y2="6" stroke="#15803d" stroke-width="2"/><polygon points="20,1 30,6 20,11" fill="#15803d"/></svg>
+          <span>settle ↓</span></div>
+        <div class="branchRow fail"><span class="tag">fail</span>
+          <svg width="30" height="12"><line x1="0" y1="6" x2="20" y2="6" stroke="#b91c1c" stroke-width="2"/><polygon points="20,1 30,6 20,11" fill="#b91c1c"/></svg>
+          <span>wait / expire</span></div>
+      </div>
+    </div>
+
+    <div class="settle">
+      <div class="settleBox">
+        <div class="hd">⬡ Present mandate to winning merchant agent → Hedera settlement</div>
+        <ul>
+          <li><span class="dot"></span><b>Allowance:</b>&nbsp;Cart ⊆ Intent (on-chain)</li>
+          <li><span class="dot"></span><b>x402 facilitator</b>&nbsp;→ settles USDC</li>
+          <li><span class="dot"></span><b>HCS topic</b>&nbsp;← mandate hashes (audit)</li>
+        </ul>
+      </div>
+      <div class="branch" style="flex:0 0 230px;">
+        <div class="branchRow pass" style="font-size:12.5px;">
+          <svg width="30" height="12"><line x1="0" y1="6" x2="20" y2="6" stroke="#15803d" stroke-width="2" stroke-dasharray="4 3"/><polygon points="20,1 30,6 20,11" fill="#15803d"/></svg>
+          <span>push → User: “bought from Costco, on its way”</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <span><b>Human signs once:</b> the Intent Mandate (merchants · scope · caps · expiry).</span>
+    <span><b>Agent negotiates per deal:</b> fan-out to merchant agents, picks the cart, binds Payment, bounded by that Intent.</span>
+  </div>
+</body>
+</html>

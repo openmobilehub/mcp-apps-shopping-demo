@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#ffffff;
+    --ink:#0f172a;
+    --muted:#64748b;
+    --line:#cbd5e1;
+    --agent:#6d28d9;     --agent-bg:#f5f3ff;  --agent-br:#ddd6fe;
+    --ours:#1d4ed8;      --ours-bg:#eff6ff;   --ours-br:#bfdbfe;
+    --merch:#0f766e;     --merch-bg:#f0fdfa;  --merch-br:#99f6e4;
+    --gate:#b45309;      --gate-bg:#fffbeb;   --gate-br:#fde68a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+    color:var(--ink);-webkit-font-smoothing:antialiased}
+  .diagram{width:880px;padding:34px 38px 30px;background:var(--bg)}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:23px;margin:6px 0 2px;font-weight:800;letter-spacing:-.01em}
+  .sub{font-size:13.5px;color:var(--muted);margin:0 0 22px;line-height:1.45}
+  .node{border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff;
+    box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .node .role{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+  .node .name{font-size:16px;font-weight:750;margin-top:3px}
+  .node .desc{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+  .agent{border-color:var(--agent-br);background:var(--agent-bg)}
+  .agent .role{color:var(--agent)}
+  .ours{border-color:var(--ours-br);background:var(--ours-bg)}
+  .ours .role{color:var(--ours)}
+  .merch{border-color:var(--merch-br);background:var(--merch-bg)}
+  .merch .role{color:var(--merch)}
+  .center{display:flex;justify-content:center}
+  .stack{display:flex;flex-direction:column;align-items:center}
+  .arrow{display:flex;flex-direction:column;align-items:center;color:var(--muted)}
+  .arrow .lbl{font-size:11.5px;font-weight:650;background:#f1f5f9;border:1px solid var(--line);
+    border-radius:999px;padding:3px 10px;margin:7px 0;color:#475569;white-space:nowrap}
+  .vbar{width:2px;height:16px;background:var(--line)}
+  .vhead{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+    border-top:7px solid var(--line)}
+  /* server-as-container */
+  .server{border:2px solid var(--ours-br);background:var(--ours-bg);border-radius:18px;padding:16px 18px;width:560px}
+  .server .hdr{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .server .title{font-size:16px;font-weight:800;color:var(--ours)}
+  .server .badge{font-size:10.5px;font-weight:700;color:#fff;background:var(--ours);border-radius:999px;padding:3px 9px}
+  .server .tag{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .inner{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+  .chip{background:#fff;border:1.4px solid var(--ours-br);border-radius:11px;padding:9px 12px;
+    font-size:12.5px;font-weight:600}
+  .chip small{display:block;font-weight:500;color:var(--muted);margin-top:2px;font-size:11.5px}
+  .gate{border-color:var(--gate-br);background:var(--gate-bg)}
+  .gate .gt{color:var(--gate);font-weight:800;font-size:12.5px}
+  .client-row{display:flex;align-items:center;gap:12px;margin-top:4px}
+  .client-row .leg{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--ours);
+    border:1.4px dashed var(--ours-br);border-radius:999px;padding:4px 10px;background:#fff}
+  .row2{display:flex;gap:22px;justify-content:center;align-items:stretch}
+  .leg-col{display:flex;flex-direction:column;align-items:center;flex:1}
+  .leg-col .lbl{font-size:11.5px;font-weight:650;background:#f1f5f9;border:1px solid var(--line);
+    border-radius:999px;padding:3px 10px;margin:8px 0;color:#475569;text-align:center}
+  .diag-line{height:18px;width:2px;background:var(--line)}
+  .note{margin-top:20px;font-size:12px;color:var(--muted);line-height:1.5;
+    border-top:1px solid #eef2f7;padding-top:12px}
+  .note b{color:var(--ink)}
+  .w-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+</style>
+</head>
+<body>
+
+<!-- ================= TOPOLOGY A ================= -->
+<div class="diagram" id="topo-a">
+  <div class="eyebrow">MCP server topology &middot; option A</div>
+  <h1>Your server <b>wraps</b> the merchant checkout (adapter)</h1>
+  <p class="sub">One integration point. Your MCP server stays the only thing the agent connects to, and
+     internally becomes an <b>MCP client</b> to the merchant&rsquo;s Checkout MCP. Your credential + AP2 gate
+     wraps the payment step.</p>
+
+  <div class="center"><div class="node agent" style="width:360px;text-align:center">
+    <div class="role">Agent &middot; host</div>
+    <div class="name">Claude &middot; ChatGPT &middot; Goose</div>
+    <div class="desc">drives browse &rarr; cart &rarr; checkout</div>
+  </div></div>
+
+  <div class="center arrow">
+    <div class="vbar"></div><div class="lbl">MCP &nbsp;(single connection)</div><div class="vbar"></div><div class="vhead"></div>
+  </div>
+
+  <div class="center">
+    <div class="server">
+      <div class="hdr">
+        <div>
+          <div class="title">your MCP server &middot; mcp-apps</div>
+          <div class="tag">owns the flow + the gate &middot; merchant is swappable behind <span class="w-mono">checkout.ts</span></div>
+        </div>
+        <div class="badge">server + client</div>
+      </div>
+      <div class="inner">
+        <div class="chip">tools: <span class="w-mono">pick</span> &middot; <span class="w-mono">checkout</span>
+          <small>the surface the agent sees</small></div>
+        <div class="chip gate"><span class="gt">Credential + AP2 gate</span>
+          <small>DC API / caBLE presentment &middot; 4 AP2 mandate checks &middot; wraps the pay step</small></div>
+        <div class="client-row">
+          <div class="leg">acts as MCP client &darr;</div>
+          <div style="font-size:11.5px;color:var(--muted)">calls <span class="w-mono">create / update / complete_checkout</span> under the hood</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="center arrow">
+    <div class="vbar"></div><div class="lbl">MCP &nbsp;(your server &rarr; merchant)</div><div class="vbar"></div><div class="vhead"></div>
+  </div>
+
+  <div class="center"><div class="node merch" style="width:430px;text-align:center">
+    <div class="role">Merchant Checkout MCP</div>
+    <div class="name">Shopify / UCP &nbsp;<span class="w-mono" style="font-weight:500">https://{shop}/api/ucp/mcp</span></div>
+    <div class="desc">real cart, checkout &amp; <span class="w-mono">complete_checkout</span></div>
+  </div></div>
+
+  <div class="note">
+    Your server is <b>both a server</b> (to the agent) <b>and a client</b> (to the merchant). The gate cleanly
+    intercepts <span class="w-mono">complete_checkout</span>, so the merchant is a pluggable adapter behind one
+    interface, the same pattern as the settlement rails. <b>Best fit for the clone-and-run demo.</b>
+  </div>
+</div>
+
+<!-- ================= TOPOLOGY B ================= -->
+<div class="diagram" id="topo-b">
+  <div class="eyebrow">MCP server topology &middot; option B</div>
+  <h1>Agent orchestrates both as <b>peers</b> (siblings)</h1>
+  <p class="sub">No wrapping. The agent connects to the merchant&rsquo;s Checkout MCP <b>and</b> your MCP server
+     directly. Yours is the authorization / credential capability the host invokes at the pay step.</p>
+
+  <div class="center"><div class="node agent" style="width:380px;text-align:center">
+    <div class="role">Agent &middot; host (orchestrator)</div>
+    <div class="name">Claude &middot; ChatGPT &middot; Goose</div>
+    <div class="desc">stitches the two servers together, calls the gate at the right moment</div>
+  </div></div>
+
+  <div class="row2" style="margin-top:6px">
+    <div class="leg-col">
+      <div class="diag-line" style="transform:rotate(20deg)"></div>
+      <div class="lbl">MCP &middot; cart / checkout</div>
+      <div class="node merch" style="width:300px;text-align:center">
+        <div class="role">Merchant Checkout MCP</div>
+        <div class="name">Shopify / UCP</div>
+        <div class="desc">cart, checkout, <span class="w-mono">complete_checkout</span></div>
+      </div>
+    </div>
+    <div class="leg-col">
+      <div class="diag-line" style="transform:rotate(-20deg)"></div>
+      <div class="lbl">MCP &middot; authorize the pay step</div>
+      <div class="node ours" style="width:320px;text-align:center;border-width:2px">
+        <div class="role" style="color:var(--ours)">your MCP server &middot; mcp-apps</div>
+        <div class="name">credential + AP2 mandate</div>
+        <div class="desc">DC API / caBLE presentment, 4 AP2 checks, settlement</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    The two servers are <b>peers</b>, not nested. Purer MCP and likely how the ecosystem composes long-term, but
+    it depends on the <b>host willing to orchestrate two servers</b> and invoke your gate at exactly the right
+    moment, less control and harder to guarantee on stage.
+  </div>
+</div>
+
+</body>
+</html>
