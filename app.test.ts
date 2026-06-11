@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { orderStore } from "./orderStore.js";
@@ -131,7 +131,44 @@ function orderToken(id: string, productId = ALCOHOL): string {
 }
 const co = (token: string) => `/checkout?order=${encodeURIComponent(token)}`;
 
+// The instant-demo endpoints flip real verification state without a credential,
+// so they only exist when DEMO_MODE is explicitly enabled.
+const demoMode = () => {
+  beforeEach(() => vi.stubEnv("DEMO_MODE", "1"));
+  afterEach(() => vi.unstubAllEnvs());
+};
+
+describe("instant-demo fencing (DEMO_MODE off by default)", () => {
+  it("refuses the demo verify (403) and leaves the order gated", async () => {
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const token = orderToken("ORD-NODEMO");
+    const res = await request(app).post("/credential-gate/age/demo").send({ order: token });
+    expect(res.status).toBe(403);
+    // The anonymous flip must not have happened: payment stays locked.
+    expect((await request(app).get(co(token))).text).toContain("Payment is locked");
+  });
+
+  it("hides the instant-demo button on the gate page", async () => {
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const res = await request(app).get("/credential-gate/age");
+    expect(res.text).not.toContain('id="demo"');
+  });
+
+  it("renders the instant-demo button when DEMO_MODE=1", async () => {
+    vi.stubEnv("DEMO_MODE", "1");
+    try {
+      const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+      const res = await request(app).get("/credential-gate/age");
+      expect(res.text).toContain('id="demo"');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe("credential gate wiring", () => {
+  demoMode();
+
   it("serves the age gate page", async () => {
     const app = createApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).get("/credential-gate/age");
@@ -177,6 +214,8 @@ describe("credential gate wiring", () => {
 });
 
 describe("server-side age gate (place-order)", () => {
+  demoMode();
+
   it("rejects place-order for an age-restricted order with no age verification (403)", async () => {
     const app = createApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-BYPASS"); // champagne, never age-verified
@@ -204,6 +243,8 @@ describe("server-side age gate (place-order)", () => {
 });
 
 describe("checkout resets verification", () => {
+  demoMode();
+
   it("place-order clears that order's verification", async () => {
     const app = createApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-RESET1");

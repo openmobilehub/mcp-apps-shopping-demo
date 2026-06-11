@@ -10,6 +10,9 @@ const DEFAULT_TTL_MS = 180_000;
 export interface ReaderContext {
   ecdhPrivateJwk: jose.JWK;
   transactionDataB64: string;
+  // Request nonce, sealed so /verify can check the wallet's response is bound
+  // to THIS request (credential gate; the payment gate binds via transaction_data).
+  nonce?: string;
 }
 
 interface SealedPayload extends ReaderContext {
@@ -32,5 +35,5 @@ export async function openReaderContext(token: string, secret: string): Promise<
   const { plaintext } = await jose.compactDecrypt(token, keyFromSecret(secret));
   const payload = JSON.parse(new TextDecoder().decode(plaintext)) as SealedPayload;
   if (Date.now() > payload.exp) throw new Error("reader context expired");
-  return { ecdhPrivateJwk: payload.ecdhPrivateJwk, transactionDataB64: payload.transactionDataB64 };
+  return { ecdhPrivateJwk: payload.ecdhPrivateJwk, transactionDataB64: payload.transactionDataB64, nonce: payload.nonce };
 }

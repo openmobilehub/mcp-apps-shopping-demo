@@ -41,6 +41,8 @@ export async function buildCredentialRequest(
     .setIssuedAt()
     .sign(privateKey as unknown as jose.KeyLike);
 
-  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: "" }, secret);
+  // Seal the nonce alongside the decryption key so /verify can require the
+  // wallet's response to be bound to THIS request (apv check), not just decrypt.
+  const readerContextToken = await sealReaderContext({ ecdhPrivateJwk, transactionDataB64: "", nonce }, secret);
   return { request, readerContextToken };
 }

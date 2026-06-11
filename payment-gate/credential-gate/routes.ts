@@ -30,6 +30,14 @@ function parseKind(raw: string | string[] | undefined): CredentialKind | null {
   return value === "age" || value === "loyalty" ? value : null;
 }
 
+// The instant-demo endpoint flips real verification state without any
+// credential, so it must be explicitly opted into (DEMO_MODE=1) and stays off
+// on real deployments. Read per-request so tests and ops can toggle it.
+function demoModeEnabled(): boolean {
+  const v = process.env.DEMO_MODE;
+  return v === "1" || v === "true";
+}
+
 // Persist a successful verification, scoped to the order being checked out.
 async function recordVerified(orderId: string, kind: CredentialKind, membershipNumber: string | null): Promise<void> {
   if (kind === "age") {
@@ -44,7 +52,7 @@ export function registerCredentialGate(app: Express): void {
     const kind = parseKind(req.params.kind);
     if (!kind) { res.status(404).type("html").send("<!doctype html><h1>Unknown gate</h1>"); return; }
     const order = typeof req.query.order === "string" ? req.query.order : undefined;
-    res.status(200).type("html").send(renderCredentialPage({ kind, order }));
+    res.status(200).type("html").send(renderCredentialPage({ kind, order, demoEnabled: demoModeEnabled() }));
   });
 
   app.get("/credential-gate/:kind/request", async (req: Request, res: Response) => {
@@ -75,10 +83,15 @@ export function registerCredentialGate(app: Express): void {
   });
 
   // Instant-demo path: no real credential exchange, just mark verified for this
-  // order. Mirrors the payment gate's "Place order (instant demo)".
+  // order. Mirrors the payment gate's "Place order (instant demo)". Fenced
+  // behind DEMO_MODE — without it this is an anonymous flip of the safety flag.
   app.post("/credential-gate/:kind/demo", express.json(), async (req: Request, res: Response) => {
     const kind = parseKind(req.params.kind);
     if (!kind) { res.status(404).json({ error: "unknown gate" }); return; }
+    if (!demoModeEnabled()) {
+      res.status(403).json({ verified: false, error: "Instant demo is disabled. Set DEMO_MODE=1 on demo deployments to enable it." });
+      return;
+    }
     const order = orderFromToken(req.body?.order);
     if (!order) { res.status(400).json({ verified: false, error: "missing or invalid order" }); return; }
     await recordVerified(order.id, kind, kind === "loyalty" ? "DEMO-LOYALTY" : null);

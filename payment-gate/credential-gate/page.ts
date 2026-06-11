@@ -8,6 +8,7 @@ export type CredentialKind = "age" | "loyalty";
 interface PageArgs {
   kind: CredentialKind;
   order?: string; // optional order token, echoed back so the widget can resume
+  demoEnabled?: boolean; // render the instant-demo button (DEMO_MODE deployments only)
 }
 
 const COPY: Record<CredentialKind, { title: string; lede: string; cta: string; demo: string }> = {
@@ -56,7 +57,7 @@ export function renderCredentialPage(args: PageArgs): string {
   <h1>${escapeHtml(c.title)}</h1>
   <p class="lede">${escapeHtml(c.lede)}</p>
   <button id="go">${escapeHtml(c.cta)}</button>
-  <button id="demo" class="secondary">${escapeHtml(c.demo)}</button>
+  ${args.demoEnabled ? `<button id="demo" class="secondary">${escapeHtml(c.demo)}</button>` : ""}
   <div id="log"></div>
   <div id="done">✓ Done — you can close this page and return to the chat.</div>
   <script type="module">
@@ -70,7 +71,7 @@ export function renderCredentialPage(args: PageArgs): string {
     const step = (t, c = "") => { const d = document.createElement("div"); d.className = "step " + c; d.textContent = t; log.appendChild(d); };
     function notice(html) { const d = document.createElement("div"); d.className = "notice"; d.innerHTML = html; log.appendChild(d); }
     function done() {
-      go.disabled = true; demo.disabled = true;
+      go.disabled = true; if (demo) demo.disabled = true;
       if (ORDER) { window.location.href = "/checkout?order=" + encodeURIComponent(ORDER); return; }
       doneEl.style.display = "block";
     }
@@ -78,7 +79,7 @@ export function renderCredentialPage(args: PageArgs): string {
     go.addEventListener("click", async () => {
       go.disabled = true;
       if (!("credentials" in navigator) || !window.DigitalCredential) {
-        notice("This browser doesn't support <code>navigator.credentials.get({digital})</code> (need <strong>Chrome 141+</strong>). Use the instant-demo button below.");
+        notice("This browser doesn't support <code>navigator.credentials.get({digital})</code> (need <strong>Chrome 141+</strong>)." + (demo ? " Use the instant-demo button below." : ""));
         go.disabled = false;
         return;
       }
@@ -103,14 +104,14 @@ export function renderCredentialPage(args: PageArgs): string {
       }
     });
 
-    demo.addEventListener("click", async () => {
+    if (demo) demo.addEventListener("click", async () => {
       demo.disabled = true;
       try {
         const out = await fetch(base + "/demo", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ order: ORDER }),
         }).then((r) => r.json());
-        if (!out.verified) throw new Error("demo failed");
+        if (!out.verified) throw new Error(out.error || "demo failed");
         step("✓ verified (instant demo)", "ok");
         done();
       } catch (err) {

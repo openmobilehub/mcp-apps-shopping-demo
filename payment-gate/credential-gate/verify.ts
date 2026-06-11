@@ -124,6 +124,15 @@ export async function verifyCredentialPresentation(args: {
   const jwe: string | undefined = (data as { response?: string } | undefined)?.response;
   if (!jwe) throw new Error("no .response (JWE) in result.data");
 
+  // Nonce binding (replay protection): OpenID4VP response encryption requires
+  // the wallet to echo the request nonce as the JWE `apv` parameter. Decrypting
+  // alone proves nothing — a captured response to an older request also
+  // decrypts — so refuse anything not bound to the nonce sealed at /request.
+  if (!ctx.nonce) throw new Error("reader context has no nonce to check");
+  if (jose.decodeProtectedHeader(jwe).apv !== jose.base64url.encode(ctx.nonce)) {
+    throw new Error("nonce mismatch: response is not bound to this request");
+  }
+
   const encPrivKey = await jose.importJWK(ctx.ecdhPrivateJwk, "ECDH-ES");
   const { plaintext } = await jose.compactDecrypt(jwe, encPrivKey);
   const openid4vpResponse = JSON.parse(new TextDecoder().decode(plaintext)) as { vp_token?: unknown };
