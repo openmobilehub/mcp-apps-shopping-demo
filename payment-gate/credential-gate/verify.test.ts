@@ -70,24 +70,27 @@ describe("evaluateCredential — loyalty (requires a membership number)", () => 
 });
 
 // --- nonce / replay binding -------------------------------------------------
-// The wallet must echo the request nonce as the JWE `apv` key-agreement
-// parameter (OpenID4VP response encryption). A response that merely decrypts —
-// e.g. a captured one bound to an older request — must be rejected.
+// The wallet echoes the request nonce as a JWE key-agreement parameter.
+// Conventions differ — Multipaz puts the request nonce in `apu` (apv carries
+// its own wallet-generated nonce); older drafts used `apv` — so the verifier
+// accepts the nonce in either. A response bound to neither must be rejected.
 
 const SECRET = "test-gate-secret";
 const ORIGIN = { rpID: "localhost", origin: "http://localhost:3030" };
 
 // Build a wallet-style encrypted response to a fresh credential request.
-// `apvFor` maps the request nonce to the apv the "wallet" echoes (null = omit).
-async function walletJwe(apvFor: (nonce: string) => Uint8Array | null): Promise<{ jwe: string; readerContextToken: string }> {
+// `paramsFor` maps the request nonce to the apu/apv the "wallet" echoes.
+async function walletJwe(
+  paramsFor: (nonce: string) => { apu?: Uint8Array; apv?: Uint8Array },
+): Promise<{ jwe: string; readerContextToken: string }> {
   const { request, readerContextToken } = await buildCredentialRequest("age", ORIGIN, SECRET);
   const claims = jose.decodeJwt(request) as { nonce: string; client_metadata: { jwks: { keys: jose.JWK[] } } };
   const encKey = await jose.importJWK(claims.client_metadata.jwks.keys[0], "ECDH-ES");
   const enc = new jose.CompactEncrypt(
     new TextEncoder().encode(JSON.stringify({ vp_token: {} })),
   ).setProtectedHeader({ alg: "ECDH-ES", enc: "A128GCM" });
-  const apv = apvFor(claims.nonce);
-  if (apv) enc.setKeyManagementParameters({ apv });
+  const params = paramsFor(claims.nonce);
+  if (params.apu || params.apv) enc.setKeyManagementParameters(params);
   return { jwe: await enc.encrypt(encKey), readerContextToken };
 }
 
@@ -101,20 +104,32 @@ const verify = (jwe: string, readerContextToken: string) =>
   });
 
 describe("verifyCredentialPresentation — nonce binding", () => {
-  it("accepts a response whose apv echoes the request nonce (then fails closed on claims)", async () => {
-    const { jwe, readerContextToken } = await walletJwe((nonce) => new TextEncoder().encode(nonce));
+  it("accepts a Multipaz-style response: request nonce in apu, wallet's own nonce in apv", async () => {
+    const { jwe, readerContextToken } = await walletJwe((nonce) => ({
+      apu: new TextEncoder().encode(nonce),
+      apv: new TextEncoder().encode("wallet-generated-nonce"),
+    }));
     const out = await verify(jwe, readerContextToken);
     // Nonce check passes; verification still fails closed (no age claim disclosed).
     expect(out.verified).toBe(false);
   });
 
+  it("accepts a response whose apv echoes the request nonce (draft-era convention)", async () => {
+    const { jwe, readerContextToken } = await walletJwe((nonce) => ({ apv: new TextEncoder().encode(nonce) }));
+    const out = await verify(jwe, readerContextToken);
+    expect(out.verified).toBe(false);
+  });
+
   it("REJECTS a response bound to a different nonce, even though it decrypts", async () => {
-    const { jwe, readerContextToken } = await walletJwe(() => new TextEncoder().encode("stale-nonce-from-another-request"));
+    const { jwe, readerContextToken } = await walletJwe(() => ({
+      apu: new TextEncoder().encode("stale-nonce-from-another-request"),
+      apv: new TextEncoder().encode("wallet-generated-nonce"),
+    }));
     await expect(verify(jwe, readerContextToken)).rejects.toThrow(/nonce/);
   });
 
-  it("REJECTS a response with no apv at all", async () => {
-    const { jwe, readerContextToken } = await walletJwe(() => null);
+  it("REJECTS a response with no apu/apv at all", async () => {
+    const { jwe, readerContextToken } = await walletJwe(() => ({}));
     await expect(verify(jwe, readerContextToken)).rejects.toThrow(/nonce/);
   });
 });

@@ -124,12 +124,19 @@ export async function verifyCredentialPresentation(args: {
   const jwe: string | undefined = (data as { response?: string } | undefined)?.response;
   if (!jwe) throw new Error("no .response (JWE) in result.data");
 
-  // Nonce binding (replay protection): OpenID4VP response encryption requires
-  // the wallet to echo the request nonce as the JWE `apv` parameter. Decrypting
-  // alone proves nothing — a captured response to an older request also
-  // decrypts — so refuse anything not bound to the nonce sealed at /request.
+  // Nonce binding: the wallet echoes the request nonce as a JWE key-agreement
+  // parameter. Conventions differ — Multipaz sends it in `apu` (its `apv` is a
+  // wallet-generated nonce); pre-1.0 drafts used `apv` — so accept the nonce in
+  // either slot, but refuse a response bound to neither. Defense-in-depth: the
+  // per-request ephemeral key already stops cross-request replay at decryption;
+  // the spec-level binding (nonce inside the device-signed SessionTranscript)
+  // is part of the mdoc trust verification future work.
   if (!ctx.nonce) throw new Error("reader context has no nonce to check");
-  if (jose.decodeProtectedHeader(jwe).apv !== jose.base64url.encode(ctx.nonce)) {
+  const { apu, apv } = jose.decodeProtectedHeader(jwe);
+  // JOSE-standard form (base64url of the nonce text), plus the raw value for
+  // implementations that treat the already-base64url nonce as pre-encoded.
+  const nonceForms = [jose.base64url.encode(ctx.nonce), ctx.nonce];
+  if (![apu, apv].some((p) => typeof p === "string" && nonceForms.includes(p))) {
     throw new Error("nonce mismatch: response is not bound to this request");
   }
 
