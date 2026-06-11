@@ -128,8 +128,18 @@ describe("verifyCredentialPresentation — nonce binding", () => {
     await expect(verify(jwe, readerContextToken)).rejects.toThrow(/nonce/);
   });
 
-  it("REJECTS a response with no apu/apv at all", async () => {
+  it("accepts a response that omits apu/apv (optional in OpenID4VP 1.0; binding rests on the per-request encryption key)", async () => {
     const { jwe, readerContextToken } = await walletJwe(() => ({}));
-    await expect(verify(jwe, readerContextToken)).rejects.toThrow(/nonce/);
+    const out = await verify(jwe, readerContextToken);
+    expect(out.verified).toBe(false); // still fails closed on the missing age claim
+  });
+
+  it("accepts empty-string apu/apv (as the Multipaz test app sends cross-device)", async () => {
+    const { jwe, readerContextToken } = await walletJwe(() => ({
+      apu: new Uint8Array(0),
+      apv: new Uint8Array(0),
+    }));
+    const out = await verify(jwe, readerContextToken);
+    expect(out.verified).toBe(false);
   });
 });

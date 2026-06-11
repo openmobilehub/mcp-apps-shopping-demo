@@ -114,8 +114,9 @@ returns), at the end of the flow:
 - If the order contains an age-restricted item, **payment is locked** and a
   **Verify age** button requests a digital ID (`age_over_21`) via OpenID4VP. The
   threshold is per product (`minimumAge`), and the check fails closed (requires
-  an explicit positive claim; the wallet's response must also echo the request
-  nonce, so a captured response can't be replayed).
+  an explicit positive claim). Responses are bound per request: each one is
+  encrypted to a fresh short-lived key, and a response that echoes a different
+  request's nonce is refused.
 - **Apply loyalty discount** presents a loyalty credential (validated
   `membership_number`) for 10% off the whole cart.
 

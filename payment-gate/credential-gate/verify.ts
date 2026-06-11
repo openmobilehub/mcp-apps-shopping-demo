@@ -124,19 +124,23 @@ export async function verifyCredentialPresentation(args: {
   const jwe: string | undefined = (data as { response?: string } | undefined)?.response;
   if (!jwe) throw new Error("no .response (JWE) in result.data");
 
-  // Nonce binding: the wallet echoes the request nonce as a JWE key-agreement
-  // parameter. Conventions differ — Multipaz sends it in `apu` (its `apv` is a
-  // wallet-generated nonce); pre-1.0 drafts used `apv` — so accept the nonce in
-  // either slot, but refuse a response bound to neither. Defense-in-depth: the
-  // per-request ephemeral key already stops cross-request replay at decryption;
-  // the spec-level binding (nonce inside the device-signed SessionTranscript)
+  // Nonce binding — reject on contradiction, accept on absence. OpenID4VP 1.0
+  // makes the apu/apv key-agreement parameters optional (the Multipaz test app
+  // sends them empty cross-device; some same-device paths echo the request
+  // nonce in apu; pre-1.0 drafts used apv), so their absence proves nothing —
+  // but a NON-EMPTY value bound to a DIFFERENT nonce is a response produced for
+  // another request, and is refused. Request-binding doesn't rest on this echo:
+  // every /request seals a fresh ephemeral decryption key with a short TTL, so
+  // a captured response only ever decrypts under the request that produced it.
+  // The spec-level binding (nonce inside the device-signed SessionTranscript)
   // is part of the mdoc trust verification future work.
   if (!ctx.nonce) throw new Error("reader context has no nonce to check");
   const { apu, apv } = jose.decodeProtectedHeader(jwe);
   // JOSE-standard form (base64url of the nonce text), plus the raw value for
   // implementations that treat the already-base64url nonce as pre-encoded.
   const nonceForms = [jose.base64url.encode(ctx.nonce), ctx.nonce];
-  if (![apu, apv].some((p) => typeof p === "string" && nonceForms.includes(p))) {
+  const echoed = [apu, apv].filter((p): p is string => typeof p === "string" && p.length > 0);
+  if (echoed.length > 0 && !echoed.some((p) => nonceForms.includes(p))) {
     throw new Error("nonce mismatch: response is not bound to this request");
   }
 
