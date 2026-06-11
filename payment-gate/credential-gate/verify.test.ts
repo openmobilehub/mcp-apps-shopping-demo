@@ -20,11 +20,11 @@ describe("evaluateCredential — age (fails closed, threshold = product)", () =>
   it("FAILS when a token is returned but no age claim is disclosed", () => {
     // Token-presence must not pass the gate — DCQL requesting a claim does not
     // constrain its value.
-    const r = evaluateCredential("age", [], { tokenPresent: true, minimumAge: 21 });
+    const r = evaluateCredential("age", [], { minimumAge: 21 });
     expect(r.verified).toBe(false);
   });
   it("FAILS when age_over_21 is explicitly false (even with a token)", () => {
-    const r = evaluateCredential("age", disclosed("org.iso.18013.5.1 / age_over_21", false), { tokenPresent: true, minimumAge: 21 });
+    const r = evaluateCredential("age", disclosed("org.iso.18013.5.1 / age_over_21", false), { minimumAge: 21 });
     expect(r.verified).toBe(false);
   });
   it("FAILS a 21+ gate on age_over_18 alone", () => {

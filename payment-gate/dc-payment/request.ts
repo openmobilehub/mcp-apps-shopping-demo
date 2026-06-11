@@ -51,11 +51,7 @@ export interface SignedRequest {
 export async function buildSignedRequest(order: Order, origin: Origin, secret: string): Promise<SignedRequest> {
   const { x5c, privateKey } = await makeReaderCert(origin.rpID);
 
-  // Ephemeral P-256 key the wallet encrypts its response to.
-  const encKP = await webcrypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
-  const encPubJwk = await webcrypto.subtle.exportKey("jwk", encKP.publicKey);
-  const ecdhPrivateJwk = (await webcrypto.subtle.exportKey("jwk", encKP.privateKey)) as jose.JWK;
-  const encJwk = { kty: "EC", crv: "P-256", x: encPubJwk.x, y: encPubJwk.y, use: "enc", alg: "ECDH-ES", kid: "response-encryption-key" };
+  const { encJwk, ecdhPrivateJwk } = await makeEncryptionKey();
 
   const txDataB64 = encodeTransactionData(buildTransactionData(order, origin));
   const nonce = jose.base64url.encode(webcrypto.getRandomValues(new Uint8Array(16)));

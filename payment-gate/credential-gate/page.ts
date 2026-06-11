@@ -3,7 +3,7 @@
 // POSTs the encrypted response to /verify. Falls back to an instant-demo button
 // (POST /demo) when the Digital Credentials API is unavailable. Styled like the
 // dc-payment gate.
-export type CredentialKind = "age" | "loyalty";
+import type { CredentialKind } from "./dcql.js";
 
 interface PageArgs {
   kind: CredentialKind;

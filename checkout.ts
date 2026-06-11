@@ -1,4 +1,3 @@
-import http from "node:http";
 import { randomBytes } from "node:crypto";
 import { createOrder, requiredAgeForLines, LOYALTY_DISCOUNT_PCT, type CartItemInput, type Order, type PriceOpts } from "./catalog.js";
 import type { CompletedOrder } from "./orderStore.js";
@@ -258,27 +257,4 @@ export function checkoutResponse(
   } catch {
     return { status: 404, html: renderNotFound() };
   }
-}
-
-// Lightweight standalone listener for the mock checkout page. Started alongside
-// the stdio transport so `openLink` has something to open in the browser.
-export function startCheckoutHttpServer(
-  port = Number(process.env.CHECKOUT_PORT ?? 3030),
-): http.Server {
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url ?? "/", `http://localhost:${port}`);
-    if (url.pathname === "/checkout") {
-      const { status, html } = checkoutResponse(url.searchParams.get("order") ?? undefined);
-      res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
-      res.end(html);
-      return;
-    }
-    res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
-    res.end(renderNotFound());
-  });
-  server.listen(port, () => {
-    checkoutBaseUrl = `http://localhost:${port}`;
-    console.error(`Checkout page on ${checkoutBaseUrl}/checkout`);
-  });
-  return server;
 }
