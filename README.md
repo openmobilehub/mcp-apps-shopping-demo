@@ -155,11 +155,15 @@ off and checkout behaves exactly as before. Env vars, the live-lab script
 See it running end to end (browse → edit cart → checkout with Digital Payment
 Credentials → AP2 Payment Mandate):
 
-- **Full flow — multi-credential checkout + x402 settlement on Hedera:**
-  <https://www.youtube.com/watch?v=biTqHo2dL7M> — Claude builds the cart;
-  loyalty + age credentials presented cross-device from a phone (selective
-  disclosure); one passkey biometric → x402 settlement on Hedera testnet in
-  ~4s; verified on HashScan.
+**Full flow — multi-credential checkout + x402 settlement on Hedera** (3 min):
+Claude builds the cart; loyalty + age credentials presented cross-device from a
+phone (selective disclosure); one passkey biometric → x402 settlement on Hedera
+testnet in ~4s; verified on HashScan.
+
+[![Watch the full-flow demo: agentic checkout with x402 settlement on Hedera](https://img.youtube.com/vi/biTqHo2dL7M/maxresdefault.jpg)](https://www.youtube.com/watch?v=biTqHo2dL7M)
+
+More demos:
+
 - **Claude native app:** <https://youtube.com/shorts/JA91c2d2DhQ>
 - **ChatGPT:** <https://youtube.com/shorts/8rMx5P1AOgI>
 - **Claude desktop (claude.ai):** <https://youtu.be/MDlyOMIAgYg>
