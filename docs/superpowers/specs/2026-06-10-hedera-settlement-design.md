@@ -225,6 +225,8 @@ this spec's References section once run.
   `payment-gate/mandate.ts`
 - Completion paths: `payment-gate/passkey/routes.ts`,
   `payment-gate/dc-payment/routes.ts`, `app.ts` (`/checkout/place-order`)
+- Demo video (full flow on the production deployment, 2026-06-12):
+  <https://www.youtube.com/watch?v=biTqHo2dL7M>
 - Lab 1 result: **PASSED 2026-06-10** — the live blocky402 facilitator verified
   AND settled an **Ed25519**-signed, recipient-bound transfer end to end:
   session wallet `0.0.9189841` (minted seconds earlier) → merchant
