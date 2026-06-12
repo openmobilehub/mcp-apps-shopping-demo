@@ -8,8 +8,11 @@ phone via cross-device sign-in), and the server produces a structurally
 [AP2](https://github.com/google-agentic-commerce/AP2)-shaped **Payment Mandate**
 that passes four validation gates.
 
-Nothing is charged. This is an authorization gesture over a real cryptographic
-ceremony, not a payment integration.
+The ceremony is a real cryptographic authorization gesture — and when the
+Hedera env vars are configured, completion **settles on-chain** via the x402
+protocol on Hedera testnet (see
+[`hedera-settlement/README.md`](hedera-settlement/README.md)). Without them,
+nothing is charged.
 
 ## Where it sits in the flow
 
@@ -113,9 +116,11 @@ laptop" work without any device-pairing infrastructure of our own.
 > origin: open checkout → Authorize → "use a phone" → scan → biometric → confirm
 > the desktop renders the four-gate receipt.)_
 
-## What's deferred
+## Beyond authorization
 
-This is the **passkey** gate. A separate follow-up adds the **Digital Credentials
-(DC) payment gate** — mdoc/CBOR decode, OpenID4VP, a QR page, and *cryptographic*
-amount-binding (where the amount really is signed). The passkey page is where the
-fallback *to* that gate will live.
+The **Digital Credentials (DC) payment gate** (`dc-payment/`) adds the
+cross-device, *cryptographically* amount-bound variant (the wallet signs the
+exact total via OpenID4VP). The **Hedera settlement leg**
+(`hedera-settlement/`) turns a completed passkey authorization into a real
+on-chain x402 settlement; the dc-payment and instant-demo paths intentionally
+do not settle yet.
