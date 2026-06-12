@@ -129,6 +129,27 @@ wallet-free fallback (no Chrome 141+ needed) that marks the order verified
 without presenting a credential. It's off by default because it bypasses the
 real check; enable it only on demo deployments.
 
+### x402 settlement on Hedera testnet
+
+After the passkey gate's four mandate gates pass, the shared completion path
+(`payment-gate/completion.ts`) re-prices the order against the catalog
+(loyalty-aware) and — when the `HEDERA_*` env vars are set — **settles it
+on-chain**: a recipient-bound Hedera `TransferTransaction` submitted through the
+[blocky402](https://blocky402.com) x402 facilitator, which can only co-sign or
+refuse (payTo and the exact amount live inside the client-signed bytes). The
+receipt shows the amount in ℏ, the payer/merchant accounts, settlement speed,
+and a HashScan link + QR; the agent's order-status result carries the same
+proof into the chat. Settlement **gates completion**: if it is configured and
+fails, the order is authorized-but-not-completed.
+
+Amounts use a micro demo peg (1 USD = 0.0001 ℏ) so faucet credit lasts. By
+default each order is paid by a fresh per-order session wallet whose key never
+outlives the request; set the optional static demo customer to give the buyer
+side one stable HashScan history. Without any `HEDERA_*` env vars the feature is
+off and checkout behaves exactly as before. Env vars, the live-lab script
+(`npm run lab:settle`), and design notes:
+[`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md).
+
 ## Demo
 
 See it running end to end (browse → edit cart → checkout with Digital Payment
@@ -311,7 +332,9 @@ pieces of shared state are handled differently:
    link points at the deployment's own origin. Set `PUBLIC_BASE_URL` only if you
    want to override it (e.g. a custom domain). `ALLOWED_HOSTS` is optional and
    off by default. Set `DEMO_MODE=1` if the deployment should offer the
-   wallet-free instant-demo buttons on the age/loyalty gate pages.
+   wallet-free instant-demo buttons on the age/loyalty gate pages. To enable
+   on-chain settlement, add the `HEDERA_*` vars (see
+   [`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md)).
 
 4. **Add the connector** in Claude (or ChatGPT) using the deployment's `/mcp`
    URL — `https://YOUR-PROJECT.vercel.app/mcp`.
@@ -371,6 +394,14 @@ npx @modelcontextprotocol/inspector node dist/main.js --stdio   # inspect tools/
   and listens locally, and starts the checkout listener in stdio mode
 - `api/index.ts` / `vercel.json` — Vercel serverless entrypoint (`export default
   createApp()`) and config that rewrites all paths to the one function
+- `payment-gate/completion.ts` — the passkey path's single completion helper:
+  gates → idempotency → catalog re-pricing → optional x402 settlement → order
+  record; settlement failure blocks completion
+- `payment-gate/hedera-settlement/` — recipient-bound x402 settlement on Hedera
+  testnet via the blocky402 facilitator (config / transfer / wallet /
+  facilitator / settle / lab)
+- `payment-gate/qr.ts` — SVG QR endpoint for the receipt, locked to
+  hashscan.io URLs
 - `catalog.ts` — sample products + reviews + `priceCart` / `createOrder` /
   `getProduct` / `getReviews` helpers
 - `src/app.tsx` — React selection UI with a footer Checkout button; one bundle
