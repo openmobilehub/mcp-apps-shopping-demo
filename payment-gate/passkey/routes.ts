@@ -3,10 +3,8 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { decodeOrder, isAgeUnverified } from "../../checkout.js";
-import { cartStore } from "../../cartStore.js";
-import { orderStore } from "../../orderStore.js";
-import { verificationStore } from "../../verificationStore.js";
 import { deriveOrigin } from "../origin.js";
+import { completeOrder } from "../completion.js";
 import { gateSecret } from "../challengeToken.js";
 import { buildPasskeyMandate, buildBindingFields, runGates } from "../mandate.js";
 import { buildRegistrationOptions, verifyPasskeyAssertion } from "./verify.js";
@@ -72,25 +70,25 @@ export function registerPasskeyGate(app: Express): void {
         res.status(403).json({ mandate, gates, completed: false, error: "Age verification required for this order." });
         return;
       }
-      // Only a fully-authorized mandate completes the purchase: record it for the
-      // agent to poll and clear the shared cart so the next session starts fresh.
-      const completed = gates.every((g) => g.pass);
-      if (completed) {
-        await orderStore.write({
-          orderId: order.id,
-          mandateId: mandate.id,
-          amount: mandate.payment.amount,
-          currency: mandate.payment.currency,
-          method: "passkey",
-          instrument: { issuer: mandate.payment.instrument, maskedAccount: mandate.payment.instrumentReference, holder: null },
-          gates: gates.map((g) => ({ gate: g.gate, pass: g.pass, detail: g.detail })),
-          completedAt: new Date().toISOString(),
-        });
-        await cartStore.write(new Map());
-        // Completed purchase: clear this order's verification.
-        await verificationStore.clear(order.id);
-      }
-      res.json({ mandate, gates, completed, binding: buildBindingFields(order, origin) });
+      // Completion (incl. optional Hedera settlement) is enforced by the shared
+      // helper; only a fully-authorized mandate completes the purchase and clears the cart.
+      const completion = await completeOrder({
+        order,
+        mandateId: mandate.id,
+        amount: mandate.payment.amount,
+        currency: mandate.payment.currency,
+        method: "passkey",
+        instrument: { issuer: mandate.payment.instrument, maskedAccount: mandate.payment.instrumentReference, holder: null },
+        gates: gates.map((g) => ({ gate: g.gate, pass: g.pass, detail: g.detail })),
+      });
+      res.json({
+        mandate,
+        gates,
+        completed: completion.completed,
+        settlement: completion.settlement ?? null,
+        settlementError: completion.settlementError ?? null,
+        binding: buildBindingFields(order, origin),
+      });
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
     }
