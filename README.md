@@ -4,8 +4,8 @@
 <tr>
 <td align="center" colspan="3">
 <a href="https://www.youtube.com/watch?v=biTqHo2dL7M">
-<img src="https://img.youtube.com/vi/biTqHo2dL7M/maxresdefault.jpg" width="860" alt="Full-flow demo: agentic checkout with cross-device credentials and x402 settlement on Hedera testnet"><br>
-▶︎ <b>Full flow — multi-credential checkout + x402 settlement on Hedera</b> (3 min)
+<img src="https://img.youtube.com/vi/biTqHo2dL7M/maxresdefault.jpg" width="860" alt="Full-flow demo: agentic checkout with cross-device credentials and x402 on-chain settlement (Hedera testnet)"><br>
+▶︎ <b>Full flow — multi-credential checkout + x402 on-chain settlement</b> (3 min)
 </a>
 </td>
 </tr>
@@ -137,12 +137,15 @@ wallet-free fallback (no Chrome 141+ needed) that marks the order verified
 without presenting a credential. It's off by default because it bypasses the
 real check; enable it only on demo deployments.
 
-### x402 settlement on Hedera testnet
+### x402 on-chain settlement
 
 After the passkey gate's four mandate gates pass, the shared completion path
 (`payment-gate/completion.ts`) re-prices the order against the catalog
-(loyalty-aware) and — when the `HEDERA_*` env vars are set — **settles it
-on-chain**: a recipient-bound Hedera `TransferTransaction` submitted through the
+(loyalty-aware) and — when the settlement env vars are set — **settles it
+on-chain via the [x402 protocol](https://github.com/coinbase/x402)**. x402 is
+chain-generic (the same facilitator API serves EVM, Solana, and Hedera
+networks); this demo's first settlement rail is **Hedera testnet**: a
+recipient-bound `TransferTransaction` submitted through the
 [blocky402](https://blocky402.com) x402 facilitator, which can only co-sign or
 refuse (payTo and the exact amount live inside the client-signed bytes). The
 receipt shows the amount in ℏ, the payer/merchant accounts, settlement speed,
@@ -163,10 +166,10 @@ off and checkout behaves exactly as before. Env vars, the live-lab script
 See it running end to end (browse → edit cart → checkout with Digital Payment
 Credentials → AP2 Payment Mandate):
 
-**Full flow — multi-credential checkout + x402 settlement on Hedera** (3 min):
+**Full flow — multi-credential checkout + x402 on-chain settlement** (3 min):
 Claude builds the cart; loyalty + age credentials presented cross-device from a
-phone (selective disclosure); one passkey biometric → x402 settlement on Hedera
-testnet in ~4s; verified on HashScan.
+phone (selective disclosure); one passkey biometric → x402 settlement in ~4s
+(Hedera testnet); verified on HashScan.
 
 Watch: <https://www.youtube.com/watch?v=biTqHo2dL7M>
 
@@ -414,9 +417,9 @@ npx @modelcontextprotocol/inspector node dist/main.js --stdio   # inspect tools/
 - `payment-gate/completion.ts` — the passkey path's single completion helper:
   gates → idempotency → catalog re-pricing → optional x402 settlement → order
   record; settlement failure blocks completion
-- `payment-gate/hedera-settlement/` — recipient-bound x402 settlement on Hedera
-  testnet via the blocky402 facilitator (config / transfer / wallet /
-  facilitator / settle / lab)
+- `payment-gate/hedera-settlement/` — recipient-bound x402 settlement via the
+  blocky402 facilitator, currently on Hedera testnet (config / transfer /
+  wallet / facilitator / settle / lab)
 - `payment-gate/qr.ts` — SVG QR endpoint for the receipt, locked to
   hashscan.io URLs
 - `catalog.ts` — sample products + reviews + `priceCart` / `createOrder` /
