@@ -1,5 +1,23 @@
 import { Redis } from "@upstash/redis";
 
+// One real on-chain settlement backing a completed order. Produced by
+// payment-gate/hedera-settlement/settle.ts; absent when settlement is not
+// configured (the gates then complete mock-only, exactly as before).
+export interface SettlementRecord {
+  network: "hedera-testnet";
+  // kind distinguishes who held the paying key; future: "custodial" | "self-custody"
+  payer: { accountId: string; kind: "session-wallet" | "house" };
+  payTo: string;
+  amountTinybar: number;
+  fxRate: string; // demo peg, recorded honestly
+  txId: string;
+  hashscanUrl: string;
+  settledInMs: number; // wall-clock for the whole leg: mint → sign → facilitate
+  walletAgeMs: number; // how old the per-order session wallet was when it paid
+  status: "settled"; // a failed settlement never produces a CompletedOrder
+  facilitator: "blocky402";
+}
+
 // A completed-purchase record. The checkout hand-off page authorizes a payment
 // mandate; on success the gate writes one of these so the agent can later poll
 // it (MCP has no server->client push) and confirm the purchase to the user.
@@ -12,6 +30,7 @@ export interface CompletedOrder {
   instrument: { issuer: string | null; maskedAccount: string | null; holder: string | null } | null;
   gates: { gate: string; pass: boolean; detail: string }[];
   completedAt: string;
+  settlement?: SettlementRecord;
 }
 
 export interface OrderStore {
