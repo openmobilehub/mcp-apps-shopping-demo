@@ -6,7 +6,7 @@ import { PrivateKey } from "@hashgraph/sdk";
 import type { Order } from "../../catalog.js";
 import type { SettlementRecord } from "../../orderStore.js";
 import type { HederaSettlementConfig } from "./config.js";
-import { mintSessionWallet, type SessionWallet } from "./wallet.js";
+import { mintSessionWallet, sweepSessionWallet, type SessionWallet } from "./wallet.js";
 import { buildSignedTransfer, usdToTinybar, DEMO_FX_RATE } from "./transfer.js";
 import { verifyAndSettle, type FacilitatorResult } from "./facilitator.js";
 
@@ -25,6 +25,7 @@ export interface SettleDeps {
     amountTinybar: number;
     feePayer: string;
   }) => Promise<FacilitatorResult>;
+  sweep?: typeof sweepSessionWallet;
 }
 
 export async function settleOrder(
@@ -56,20 +57,37 @@ export async function settleOrder(
     ? { accountId: config.customer.accountId, key: PrivateKey.fromString(config.customer.key) }
     : await (deps.mintWallet ?? mintSessionWallet)(config, fundingTinybar);
   const mintedAt = Date.now();
-  const transactionB64 = await (deps.buildTransfer ?? buildSignedTransfer)({
-    amountTinybar,
-    payerAccountId: wallet.accountId,
-    payerKey: wallet.key,
-    payTo: config.merchantAccountId,
-    feePayer: config.feePayer,
-  });
-  const { txId } = await (deps.facilitate ?? verifyAndSettle)({
-    facilitatorUrl: config.facilitatorUrl,
-    transactionB64,
-    payTo: config.merchantAccountId,
-    amountTinybar,
-    feePayer: config.feePayer,
-  });
+  let txId: string;
+  try {
+    const transactionB64 = await (deps.buildTransfer ?? buildSignedTransfer)({
+      amountTinybar,
+      payerAccountId: wallet.accountId,
+      payerKey: wallet.key,
+      payTo: config.merchantAccountId,
+      feePayer: config.feePayer,
+    });
+    ({ txId } = await (deps.facilitate ?? verifyAndSettle)({
+      facilitatorUrl: config.facilitatorUrl,
+      transactionB64,
+      payTo: config.merchantAccountId,
+      amountTinybar,
+      feePayer: config.feePayer,
+    }));
+  } catch (err) {
+    // A minted session wallet was funded but settlement failed — recover its
+    // balance to the operator before its key goes out of scope, otherwise the
+    // funds are stranded forever (the flip-side of key-never-persists). The
+    // static customer is reused, so its balance is left in place. Best-effort:
+    // a sweep failure must not mask the original settlement error.
+    if (!config.customer) {
+      try {
+        await (deps.sweep ?? sweepSessionWallet)(config, wallet);
+      } catch (sweepErr) {
+        console.error("session wallet sweep-back failed:", (sweepErr as Error).message);
+      }
+    }
+    throw err;
+  }
 
   const settledAt = Date.now();
   return {

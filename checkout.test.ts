@@ -144,6 +144,28 @@ describe("checkout page authorization affordance", () => {
     expect(html).not.toContain("Apply loyalty discount");
   });
 
+  it("a paid revisit of a discounted order shows the discounted total once (banner and table agree)", () => {
+    // Two units of a $69 item = $138 subtotal; loyalty makes it $124.20.
+    const order = createOrder([{ productId: "drift-mouse", quantity: 2 }], "ORD-PAIDDISC", { loyaltyApplied: true });
+    const completed = {
+      orderId: "ORD-PAIDDISC",
+      mandateId: "mandate_pm_d",
+      amount: order.total, // 124.2 — the recorded discounted amount
+      currency: order.currency,
+      method: "passkey",
+      instrument: null,
+      gates: [],
+      completedAt: new Date().toISOString(),
+    };
+    // Completion clears verification, so the revisit arrives with loyaltyApplied=false.
+    const { html } = checkoutResponse(encodeOrder(order), { loyaltyApplied: false }, completed);
+    // The Total row reflects the paid amount, not the undiscounted recompute.
+    expect(html).toContain('<tr class="total"><td>Total</td><td class="num">$124.20</td></tr>');
+    expect(html).not.toContain('<tr class="total"><td>Total</td><td class="num">$138.00</td></tr>');
+    expect(html).toContain("Loyalty discount"); // the discount row is preserved
+    expect(html).toContain("Order paid · $124.20");
+  });
+
   it("ignores a completed order for a DIFFERENT order id (still payable)", () => {
     const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PAID2");
     const other = {

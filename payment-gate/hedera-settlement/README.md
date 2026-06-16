@@ -25,6 +25,12 @@ After the four gates pass, `payment-gate/completion.ts` calls `settleOrder`:
 authorized-but-NOT-completed (no order record, cart intact, honest page state).
 With no Hedera env set, the module is off and checkout behaves exactly as before.
 
+**Sweep-back**: the flip-side of key-never-persists is that a session wallet
+funded just before a *failed* settlement would otherwise be stranded forever. On
+any post-mint failure, `settleOrder` recovers the wallet's balance to the
+operator (best-effort, while the key is still in scope) and then re-throws. The
+static demo customer is reused, so its balance is left in place.
+
 ## Env
 
 | Var | Required | Notes |

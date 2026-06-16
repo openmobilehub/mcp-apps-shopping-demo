@@ -19,6 +19,7 @@ function deps(overrides: Partial<Parameters<typeof settleOrder>[2]> = {}) {
     mintWallet: vi.fn().mockResolvedValue({ accountId: "0.0.5555", key: sessionKey }),
     buildTransfer: vi.fn().mockResolvedValue("c2lnbmVk"),
     facilitate: vi.fn().mockResolvedValue({ txId: "0.0.7162784@1700000000.000000000", payer: "0.0.5555" }),
+    sweep: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -89,14 +90,31 @@ describe("settleOrder", () => {
     expect(d.mintWallet).not.toHaveBeenCalled();
   });
 
-  it("propagates mint failure without calling the facilitator", async () => {
+  it("propagates mint failure without calling the facilitator OR sweeping (no wallet to recover)", async () => {
     const d = deps({ mintWallet: vi.fn().mockRejectedValue(new Error("operator unfunded")) });
     await expect(settleOrder(order(), config, d)).rejects.toThrowError(/operator unfunded/);
     expect(d.facilitate).not.toHaveBeenCalled();
+    expect(d.sweep).not.toHaveBeenCalled();
   });
 
-  it("propagates facilitator failure", async () => {
+  it("on facilitator failure after a mint, sweeps the wallet back to the operator and rethrows", async () => {
     const d = deps({ facilitate: vi.fn().mockRejectedValue(new Error("facilitator verify failed: nope")) });
+    await expect(settleOrder(order(), config, d)).rejects.toThrowError(/verify failed/);
+    expect(d.sweep).toHaveBeenCalledWith(config, { accountId: "0.0.5555", key: sessionKey });
+  });
+
+  it("does NOT sweep the static demo customer's account (it is reused, not disposable)", async () => {
+    const customerConfig = { ...config, customer: { accountId: "0.0.3003", key: sessionKey.toStringDer() } };
+    const d = deps({ facilitate: vi.fn().mockRejectedValue(new Error("facilitator verify failed: nope")) });
+    await expect(settleOrder(order(), customerConfig, d)).rejects.toThrowError(/verify failed/);
+    expect(d.sweep).not.toHaveBeenCalled();
+  });
+
+  it("a sweep failure is swallowed — the original settlement error still propagates", async () => {
+    const d = deps({
+      facilitate: vi.fn().mockRejectedValue(new Error("facilitator verify failed: nope")),
+      sweep: vi.fn().mockRejectedValue(new Error("sweep boom")),
+    });
     await expect(settleOrder(order(), config, d)).rejects.toThrowError(/verify failed/);
   });
 });

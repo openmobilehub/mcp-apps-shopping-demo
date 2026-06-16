@@ -51,9 +51,25 @@ describe("completeOrder", () => {
     const settle = vi.fn();
     const out = await completeOrder(input([passGate, failGate]), { settle, env: HEDERA_ENV });
     expect(out.completed).toBe(false);
+    expect(out.reason).toBe("gates"); // routine ceremony failure, not a security event
     expect(settle).not.toHaveBeenCalled();
     expect(await orderStore.read()).toBeNull();
     expect((await cartStore.read()).size).toBe(1); // cart untouched
+  });
+
+  it("a re-pricing refusal is distinguishable from a gate failure (reason='reprice')", async () => {
+    const settle = vi.fn();
+    // Gates pass, but the token claims a discount this order never verified — a
+    // tampered-token security event the operator should be able to tell apart.
+    const base = input([passGate], "ORD-REPRICE1");
+    const tampered = {
+      ...base,
+      order: { ...base.order, total: 1, lines: base.order.lines.map((l) => ({ ...l, lineTotal: 1 })) },
+    };
+    const out = await completeOrder(tampered, { settle, env: HEDERA_ENV });
+    expect(out.completed).toBe(false);
+    expect(out.reason).toBe("reprice");
+    expect(settle).not.toHaveBeenCalled();
   });
 
   it("without Hedera env: completes exactly as today (no settlement, order written, cart cleared)", async () => {

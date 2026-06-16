@@ -26,6 +26,9 @@ export interface CompletionResult {
   completed: boolean;
   settlement?: SettlementRecord;
   settlementError?: string;
+  // Why a non-completion happened, so callers/operator logs can tell a routine
+  // failed ceremony ("gates") from a tampered-token security event ("reprice").
+  reason?: "gates" | "reprice";
 }
 
 export async function completeOrder(
@@ -35,7 +38,7 @@ export async function completeOrder(
     env?: NodeJS.ProcessEnv;
   } = {},
 ): Promise<CompletionResult> {
-  if (!input.gates.every((g) => g.pass)) return { completed: false };
+  if (!input.gates.every((g) => g.pass)) return { completed: false, reason: "gates" };
 
   // Idempotency: a replayed verify for the already-recorded order must not
   // settle (or record) twice — it echoes the recorded outcome, writing and
@@ -64,13 +67,22 @@ export async function completeOrder(
     input.order.id,
     { loyaltyApplied: verification.loyalty.applied },
   );
-  if (repriced.total !== input.order.total) return { completed: false };
+  if (repriced.total !== input.order.total) return { completed: false, reason: "reprice" };
 
   const config = hederaSettlementConfig(opts.env ?? process.env);
   let settlement: SettlementRecord | undefined;
   if (config) {
     try {
       settlement = await (opts.settle ?? ((o, c) => settleOrder(o, c)))(input.order, config);
+      // Known third settlement race (submitted-but-unrecorded): if the
+      // facilitator actually submitted the transfer but the response was lost
+      // (network blip, or a crash between `settle` returning and the write
+      // below), the money moved on-chain yet no order record exists — so the
+      // idempotency check above won't find it and a retry would settle AGAIN.
+      // Accepted for the demo (settle.ts sweeps a minted wallet back on
+      // outright failure; this narrower window is unhandled). A real deployment
+      // persists a "settlement pending" marker before calling the facilitator
+      // so a retry reconciles instead of re-paying — tracked as a follow-up.
     } catch (err) {
       return { completed: false, settlementError: (err as Error).message };
     }

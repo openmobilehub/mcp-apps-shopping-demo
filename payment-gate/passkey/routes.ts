@@ -87,6 +87,7 @@ export function registerPasskeyGate(app: Express): void {
         completed: completion.completed,
         settlement: completion.settlement ?? null,
         settlementError: completion.settlementError ?? null,
+        reason: completion.reason ?? null,
         binding: buildBindingFields(order, origin),
       });
     } catch (err) {

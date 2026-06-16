@@ -171,6 +171,25 @@ flag above.
   protects the most recent order — acceptable for slice 1, recorded here.
 - **Mint failure** (e.g. unfunded operator) ⇒ clear, actionable error on the
   page; no transfer attempted.
+- **Settlement failure after mint ⇒ sweep-back.** If the facilitator rejects or
+  errors *after* a session wallet was funded, its balance would be stranded
+  forever (the key dies with the invocation — the flip-side of
+  key-never-persists). `settleOrder` recovers it to the operator with a
+  best-effort transfer while the key is still in scope, then re-throws the
+  original error. The static demo customer is reused, so its balance is left in
+  place. A sweep failure is swallowed and never masks the settlement error.
+- **Submitted-but-unrecorded (known, unhandled).** A *third* race beyond
+  replay-after-success and concurrent-verify: if the facilitator actually
+  submitted the transfer but the response was lost (network blip / crash
+  between `settle` returning and `orderStore.write`), the money moved yet no
+  record exists, so the double-submit guard won't find it and a retry settles
+  again. Accepted for the demo (the sweep-back covers outright failure, not
+  this narrower window). A real deployment persists a "settlement pending"
+  marker before calling the facilitator so a retry reconciles instead of
+  re-paying — tracked as a follow-up.
+- **Refusal reason.** A non-completion carries a `reason` (`"gates"` vs
+  `"reprice"`) so a tampered-token refusal (security event) is distinguishable
+  from a routine failed ceremony in operator logs.
 - **Demo ceiling:** one settlement may move at most $1,000 (MAX_SETTLEMENT_USD) —
   catalog re-pricing bounds price, the ceiling bounds quantity.
 - **Missing env** (`HEDERA_OPERATOR_*`, `HEDERA_MERCHANT_ACCOUNT_ID`) ⇒ the

@@ -131,7 +131,18 @@ function recomputeOrder(order: Order, loyaltyApplied: boolean): Order {
 function renderCheckoutPage(baseOrder: Order, v: CheckoutVerification = {}, paid: CompletedOrder | null = null): string {
   const loyaltyApplied = !!v.loyaltyApplied;
   const ageVerified = !!v.ageVerified;
-  const order = recomputeOrder(baseOrder, loyaltyApplied);
+  const recomputed = recomputeOrder(baseOrder, loyaltyApplied);
+  // A paid revisit arrives after completion cleared this order's verification,
+  // so `recomputed` would drop the discount the order was actually paid at and
+  // disagree with the recorded `paid.amount`. Anchor the displayed totals on
+  // that authoritative amount, deriving the discount row from the difference.
+  const order = paid
+    ? {
+        ...recomputed,
+        discount: Math.max(0, Math.round((recomputed.subtotal - paid.amount) * 100) / 100),
+        total: paid.amount,
+      }
+    : recomputed;
   // Discounted token: the payment gates decode this and bind to order.total.
   const token = encodeOrder(order);
   const enc = encodeURIComponent(token);

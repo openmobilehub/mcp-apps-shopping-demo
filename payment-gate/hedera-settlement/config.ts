@@ -25,6 +25,10 @@ export function hederaSettlementConfig(env: NodeJS.ProcessEnv): HederaSettlement
   const merchantAccountId = env.HEDERA_MERCHANT_ACCOUNT_ID;
   if (!operatorId || !operatorKey || !merchantAccountId) return null;
   if (!ENTITY_ID.test(merchantAccountId)) return null;
+  // `0.0.7162784` is the blocky402 facilitator's well-known fee-payer account
+  // for `hedera:testnet` (advertised by its `GET /supported`), so it is the
+  // correct default *paired with* the default `HEDERA_FACILITATOR_URL` above.
+  // Override BOTH together if you point at a different facilitator.
   const feePayer = env.HEDERA_FEE_PAYER ?? "0.0.7162784";
   if (!ENTITY_ID.test(feePayer)) return null;
   const customerId = env.HEDERA_CUSTOMER_ID;
