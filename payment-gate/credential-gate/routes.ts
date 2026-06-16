@@ -4,6 +4,8 @@ import { gateSecret } from "../challengeToken.js";
 import { verificationStore } from "../../verificationStore.js";
 import { buildCredentialRequest } from "./request.js";
 import { verifyCredentialPresentation } from "./verify.js";
+import { verifyMdocPresentation } from "./mdoc-verify.js";
+import { buildMdocRequestParts, sealMdocContext } from "./mdoc-iso.js";
 import { renderCredentialPage } from "./page.js";
 import type { CredentialKind } from "./dcql.js";
 import { decodeOrder } from "../../checkout.js";
@@ -59,8 +61,27 @@ export function registerCredentialGate(app: Express): void {
     const kind = parseKind(req.params.kind);
     if (!kind) { res.status(404).json({ error: "unknown gate" }); return; }
     try {
-      const out = await buildCredentialRequest(kind, originOf(req), gateSecret());
-      res.json(out);
+      // Offer BOTH protocols; the platform's DC API self-selects the one it
+      // supports (Android Chrome → openid4vp, iOS WebKit → org-iso-mdoc).
+      const secret = gateSecret();
+      const reqOrigin = originOf(req);
+      const oid = await buildCredentialRequest(kind, reqOrigin, secret);
+      // Signed (reader-authenticated) by default — required by iOS. ?signed=0
+      // forces the unsigned path for diagnostics.
+      const signed = req.query.signed !== "0";
+      const mdoc = await buildMdocRequestParts(kind, reqOrigin.origin, signed);
+      const mdocContextToken = await sealMdocContext(
+        { readerPrivateJwk: mdoc.readerPrivateJwk, base64EncryptionInfo: mdoc.base64EncryptionInfo },
+        secret,
+      );
+      res.json({
+        requests: [
+          { protocol: "openid4vp-v1-signed", data: { request: oid.request } },
+          { protocol: "org-iso-mdoc", data: mdoc.data },
+        ],
+        readerContextToken: oid.readerContextToken,
+        mdocContextToken,
+      });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
@@ -69,15 +90,24 @@ export function registerCredentialGate(app: Express): void {
   app.post("/credential-gate/:kind/verify", express.json({ limit: "4mb" }), async (req: Request, res: Response) => {
     const kind = parseKind(req.params.kind);
     if (!kind) { res.status(404).json({ error: "unknown gate" }); return; }
-    const { readerContextToken, result, order: orderToken } = req.body ?? {};
+    const { readerContextToken, mdocContextToken, result, order: orderToken } = req.body ?? {};
     const order = orderFromToken(orderToken);
     if (!order) { res.status(400).json({ verified: false, error: "missing or invalid order" }); return; }
+    if (result?.protocol === "org-iso-mdoc" && !mdocContextToken) {
+      res.status(400).json({ verified: false, error: "missing mdocContextToken for org-iso-mdoc" });
+      return;
+    }
     try {
       const minimumAge = kind === "age" ? requiredAgeFromOrder(order) : undefined;
-      const out = await verifyCredentialPresentation({ kind, result, readerContextToken, secret: gateSecret(), minimumAge });
+      const secret = gateSecret();
+      // Dispatch by the protocol the wallet actually used.
+      const out = result?.protocol === "org-iso-mdoc"
+        ? await verifyMdocPresentation({ kind, result, mdocContextToken, origin: originOf(req), secret, minimumAge })
+        : await verifyCredentialPresentation({ kind, result, readerContextToken, secret, minimumAge });
       if (out.verified) await recordVerified(order.id, kind, out.membershipNumber);
       res.json(out);
     } catch (err) {
+      console.error(`[gate/verify] kind=${kind} protocol=${(req.body?.result?.protocol) ?? "?"} FAILED:`, (err as Error).stack ?? err);
       res.status(400).json({ verified: false, error: (err as Error).message });
     }
   });

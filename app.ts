@@ -23,6 +23,17 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
 
+  if (process.env.DEBUG) {
+    app.use((req, _res, next) => {
+      if (req.path.startsWith("/credential-gate") || req.path.startsWith("/checkout")) {
+        console.error("[req]", req.method, req.path,
+          "| xfp=", req.headers["x-forwarded-proto"], "xfh=", req.headers["x-forwarded-host"],
+          "host=", req.headers["host"], "proto=", req.protocol);
+      }
+      next();
+    });
+  }
+
   app.get("/checkout", async (req: Request, res: Response) => {
     const token = typeof req.query.order === "string" ? req.query.order : undefined;
     // Age verification + loyalty happen on this page (end of flow). Read the
