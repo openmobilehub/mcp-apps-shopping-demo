@@ -42,3 +42,35 @@ describe("selectOrderStore", () => {
     expect(store).toBeInstanceOf(RedisOrderStore);
   });
 });
+
+describe("MemoryOrderStore with settlement", () => {
+  it("roundtrips a settlement record on a completed order", async () => {
+    const store = new MemoryOrderStore();
+    await store.write({
+      orderId: "ORD-SET1",
+      mandateId: "mandate_pm_x",
+      amount: 42,
+      currency: "USD",
+      method: "passkey",
+      instrument: null,
+      gates: [],
+      completedAt: new Date().toISOString(),
+      settlement: {
+        network: "hedera-testnet",
+        payer: { accountId: "0.0.111", kind: "session-wallet" },
+        payTo: "0.0.222",
+        amountTinybar: 4_200_000_000,
+        fxRate: "1 USD = 1 HBAR (demo peg)",
+        txId: "0.0.7162784@1700000000.000000000",
+        hashscanUrl: "https://hashscan.io/testnet/transaction/x",
+        settledInMs: 6400,
+        walletAgeMs: 3200,
+        status: "settled",
+        facilitator: "blocky402",
+      },
+    });
+    const read = await store.read();
+    expect(read?.settlement?.txId).toBe("0.0.7162784@1700000000.000000000");
+    expect(read?.settlement?.payer.kind).toBe("session-wallet");
+  });
+});
