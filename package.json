@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.81.0",
+    "@hpke/core": "^1.9.0",
     "@modelcontextprotocol/ext-apps": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@peculiar/x509": "^1.14.3",
