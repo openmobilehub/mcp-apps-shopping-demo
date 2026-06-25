@@ -11,6 +11,7 @@ import { registerDcPaymentGate } from "./payment-gate/dc-payment/routes.js";
 import { registerQrRoute } from "./payment-gate/qr.js";
 import { registerCredentialGate } from "./payment-gate/credential-gate/routes.js";
 import { verificationStore } from "./verificationStore.js";
+import { attestoManifest, LLMS_TXT } from "./attesto-discovery.js";
 
 export interface AppOptions {
   publicBaseUrl: string;
@@ -22,6 +23,15 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
 
   const app = createMcpExpressApp({ host: "0.0.0.0" });
   app.use(cors());
+
+  // Agent-native discovery — an agent learns the gate's shape and how to drive a
+  // refusal from these, rather than by hitting an error string.
+  app.get("/.well-known/attesto.json", (_req: Request, res: Response) => {
+    res.json(attestoManifest(publicBaseUrl));
+  });
+  app.get("/llms.txt", (_req: Request, res: Response) => {
+    res.type("text/plain").send(LLMS_TXT);
+  });
 
   app.get("/checkout", async (req: Request, res: Response) => {
     const token = typeof req.query.order === "string" ? req.query.order : undefined;
