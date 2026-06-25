@@ -17,12 +17,43 @@ import {
   getProduct,
   getReviews,
   priceCart,
+  requiredAgeForLines,
   type PricedCart,
+  type Order,
 } from "./catalog.js";
-import { createCheckoutOrder, getCheckoutBaseUrl } from "./checkout.js";
+import {
+  ageApproveUrlForOrder,
+  checkoutUrlForOrder,
+  createOrderForCheckout,
+  getCheckoutBaseUrl,
+  isAgeUnverified,
+} from "./checkout.js";
 import { cartStore } from "./cartStore.js";
 import { orderStore } from "./orderStore.js";
 import { qrPngBase64 } from "./payment-gate/qr.js";
+import { gated } from "@openmobilehub/attesto-gate";
+
+// The checkout flow, gated by @openmobilehub/attesto-gate. An age-restricted cart
+// cannot get a completable checkout link until the buyer proves age_over_21: the
+// tool returns a typed `verification_required` envelope the agent drives (which
+// credential, a per-order approve link, the tool to poll), closing the gap where
+// the MCP `checkout` tool would otherwise mint a completable link with no proof.
+// The order is created ONCE upstream (stable id) and passed straight through, so
+// the gate's approve link binds to the same order the buyer verifies.
+const gatedCheckout = gated<Order, Order>(
+  (_args, { order }) => {
+    const checkoutUrl = checkoutUrlForOrder(order);
+    const payload = { orderId: order.id, checkoutUrl };
+    return { structuredContent: payload, content: [{ type: "text", text: JSON.stringify(payload) }] };
+  },
+  { age: true },
+  {
+    resolveOrder: (order) => order,
+    isAgeUnverified: (order) => isAgeUnverified(order),
+    approveUrl: (order) => ageApproveUrlForOrder(order),
+    minAge: (order) => requiredAgeForLines(order.lines) ?? undefined,
+  },
+);
 
 // Resolve the bundled UI relative to this module, working from both
 // source (server.ts) and compiled (dist/server.js).
@@ -386,11 +417,10 @@ export function createServer(): McpServer {
           isError: true,
         };
       }
-      const { orderId, checkoutUrl } = createCheckoutOrder(entries);
-      return {
-        structuredContent: { orderId, checkoutUrl },
-        content: [{ type: "text", text: JSON.stringify({ orderId, checkoutUrl }) }],
-      };
+      // Create the order once, then let the gate decide: an age-restricted,
+      // unverified cart gets a verification_required envelope; otherwise the link.
+      const order = createOrderForCheckout(entries);
+      return (await gatedCheckout(order)) as CallToolResult;
     },
   );
 

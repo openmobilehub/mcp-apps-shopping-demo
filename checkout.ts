@@ -77,9 +77,28 @@ export function createCheckoutOrder(
   items: CartItemInput[],
   opts: PriceOpts = {},
 ): { orderId: string; checkoutUrl: string } {
-  const order = createOrder(items, nextOrderId(), opts);
-  const token = encodeOrder(order);
-  return { orderId: order.id, checkoutUrl: `${checkoutBaseUrl}/checkout?order=${token}` };
+  const order = createOrderForCheckout(items, opts);
+  return { orderId: order.id, checkoutUrl: checkoutUrlForOrder(order) };
+}
+
+// Create an order (fresh id) from cart items WITHOUT building the link, so a
+// caller can gate on the order — run the age check, build a verification_required
+// envelope — before deciding whether to hand out a completable checkout URL.
+export function createOrderForCheckout(items: CartItemInput[], opts: PriceOpts = {}): Order {
+  return createOrder(items, nextOrderId(), opts);
+}
+
+// The checkout page URL for an already-created order. Pairs with
+// createOrderForCheckout so the order is created exactly once (a fresh id each
+// call would desync the approve link from the order the buyer verifies).
+export function checkoutUrlForOrder(order: Order): string {
+  return `${checkoutBaseUrl}/checkout?order=${encodeOrder(order)}`;
+}
+
+// The per-order link the buyer opens to prove age on their phone. Same gate page
+// the checkout page's "Verify age" button targets.
+export function ageApproveUrlForOrder(order: Order): string {
+  return `${checkoutBaseUrl}/credential-gate/age?order=${encodeURIComponent(encodeOrder(order))}`;
 }
 
 // Build a completed-order record for the instant-demo path (no device prompt).
