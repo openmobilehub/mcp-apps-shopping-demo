@@ -420,6 +420,8 @@ export function createServer(): McpServer {
       // Create the order once, then let the gate decide: an age-restricted,
       // unverified cart gets a verification_required envelope; otherwise the link.
       const order = createOrderForCheckout(entries);
+      // gatedCheckout returns a MinimalToolResult (a structural subset of
+      // CallToolResult) — either the envelope or the {orderId, checkoutUrl} link.
       return (await gatedCheckout(order)) as CallToolResult;
     },
   );
