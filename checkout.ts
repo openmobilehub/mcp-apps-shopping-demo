@@ -107,6 +107,22 @@ export function ageApproveUrlForOrder(order: Order): string {
 export function demoCompletedOrder(token: string): CompletedOrder | null {
   const order = decodeOrder(token);
   if (!order) return null;
+  // Honest gate record. The place-order route enforces isAgeUnverified() before
+  // completing, so if the cart is age-restricted, age IS verified by the time we
+  // get here — record that truthfully. But the instant-demo path skips the device
+  // prompt, so NO payment was authorized; say so explicitly rather than implying a
+  // passing payment gate (a "money moves only with consent" claim must not be
+  // contradicted by the demo's own default receipt).
+  const requiredAge = requiredAgeForLines(order.lines);
+  const gates: { gate: string; pass: boolean; detail: string }[] = [];
+  if (requiredAge != null) {
+    gates.push({ gate: `Age over ${requiredAge}`, pass: true, detail: "verified for this order" });
+  }
+  gates.push({
+    gate: "Payment authorization",
+    pass: false,
+    detail: "skipped — instant demo (no device authorization, no signed mandate; not a real payment)",
+  });
   return {
     orderId: order.id,
     mandateId: `demo_${order.id}`,
@@ -114,7 +130,7 @@ export function demoCompletedOrder(token: string): CompletedOrder | null {
     currency: order.currency,
     method: "instant-demo",
     instrument: { issuer: "demo", maskedAccount: null, holder: null },
-    gates: [{ gate: "Instant demo", pass: true, detail: "Device authorization skipped (demo)" }],
+    gates,
     completedAt: new Date().toISOString(),
   };
 }
