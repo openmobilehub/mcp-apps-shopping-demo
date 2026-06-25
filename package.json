@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "description": "MCP App for Claude Desktop: interactive multi-product selector",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "product-picker": "dist/main.js"
   },
@@ -12,7 +15,8 @@
     "dev": "vite",
     "build:ui": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
-    "build": "npm run typecheck && npm run build:ui && npm run build:server",
+    "build:packages": "npm run build --workspaces --if-present",
+    "build": "npm run build:packages && npm run typecheck && npm run build:ui && npm run build:server",
     "start:stdio": "node dist/main.js --stdio",
     "start:http": "node dist/main.js",
     "test": "vitest run",
