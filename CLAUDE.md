@@ -97,3 +97,8 @@ PRs get both automated and human review:
 - A PR that edits `.github/workflows/claude-code-review.yml` itself will fail
   `claude-review` by design (the action validates the workflow matches `main`) and needs
   an admin merge.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
