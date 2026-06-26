@@ -17,7 +17,6 @@ import {
   getProduct,
   getReviews,
   priceCart,
-  requiredAgeForLines,
   type PricedCart,
   type Order,
 } from "./catalog.js";
@@ -26,34 +25,44 @@ import {
   checkoutUrlForOrder,
   createOrderForCheckout,
   getCheckoutBaseUrl,
-  isAgeUnverified,
 } from "./checkout.js";
 import { cartStore } from "./cartStore.js";
 import { orderStore } from "./orderStore.js";
 import { qrPngBase64 } from "./payment-gate/qr.js";
-import { gated } from "@openmobilehub/attesto-gate";
+import { Attesto, age, required, type GateOrder } from "@openmobilehub/attesto-gate";
 
-// The checkout flow, gated by @openmobilehub/attesto-gate. An age-restricted cart
-// cannot get a completable checkout link until the buyer proves age_over_21: the
-// tool returns a typed `verification_required` envelope the agent drives (which
-// credential, a per-order approve link, the tool to poll), closing the gap where
-// the MCP `checkout` tool would otherwise mint a completable link with no proof.
-// The order is created ONCE upstream (stable id) and passed straight through, so
-// the gate's approve link binds to the same order the buyer verifies.
-const gatedCheckout = gated<Order, Order>(
-  (_args, { order }) => {
-    const checkoutUrl = checkoutUrlForOrder(order);
-    const payload = { orderId: order.id, checkoutUrl };
-    return { structuredContent: payload, content: [{ type: "text", text: JSON.stringify(payload) }] };
-  },
-  { age: true },
-  {
-    resolveOrder: (order) => order,
-    isAgeUnverified: (order) => isAgeUnverified(order),
-    approveUrl: (order) => ageApproveUrlForOrder(order),
-    minAge: (order) => requiredAgeForLines(order.lines) ?? undefined,
-  },
-);
+// Checkout is gated by @openmobilehub/attesto-gate in consolidated Mode A: the
+// tool ALWAYS mints the checkout link AND surfaces a `requires` manifest of what
+// the page will ask for (age 21+ when the cart has alcohol). It is NOT a
+// completion path — the age gate is enforced on POST /checkout/place-order
+// (app.ts) and the device-authorization /verify handlers; the link is inert
+// until the buyer verifies there. The order is created ONCE upstream (stable id)
+// so the approve link binds to the same order the buyer verifies.
+
+// You decide what counts as age-restricted — the SDK never guesses. Alcohol items
+// carry `minimumAge` in the catalog; there is no "alcohol" category.
+const hasAlcohol = (order: GateOrder) => order.lines.some((l) => l.minimumAge != null);
+
+// v0.1 MVP policy: conditional age. (membership discount + payment join the full
+// ordered policy next — see ROADMAP / US2.)
+const checkoutPolicy = [required(age.over(21).when(hasAlcohol))];
+
+// Re-derive the per-product age threshold + category onto each line server-side
+// (invariant #2 — `PricedCartLine` doesn't carry them; never trust the token).
+function toGateOrder(order: Order): GateOrder {
+  return {
+    id: order.id,
+    total: order.total,
+    currency: order.currency,
+    lines: order.lines.map((l) => ({
+      id: l.id,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      minimumAge: getProduct(l.id)?.minimumAge,
+      category: getProduct(l.id)?.category,
+    })),
+  };
+}
 
 // Resolve the bundled UI relative to this module, working from both
 // source (server.ts) and compiled (dist/server.js).
@@ -417,12 +426,21 @@ export function createServer(): McpServer {
           isError: true,
         };
       }
-      // Create the order once, then let the gate decide: an age-restricted,
-      // unverified cart gets a verification_required envelope; otherwise the link.
+      // Create the order once (stable id), then resolve the policy to a manifest.
       const order = createOrderForCheckout(entries);
-      // gatedCheckout returns a MinimalToolResult (a structural subset of
-      // CallToolResult) — either the envelope or the {orderId, checkoutUrl} link.
-      return (await gatedCheckout(order)) as CallToolResult;
+      const attesto = new Attesto({ walletOrigin: getCheckoutBaseUrl() });
+      const checkoutUrl = checkoutUrlForOrder(order);
+      const requires = attesto.requirements(toGateOrder(order), checkoutPolicy).map((e) =>
+        // The demo is stateless: its ceremony decodes the order from the URL, so
+        // the per-order approve link carries the encoded order token, not a bare
+        // id. Substitute the demo's token-bearing link for the SDK default.
+        e.credential === "age" ? { ...e, approveUrl: ageApproveUrlForOrder(order) } : e,
+      );
+      const payload = { orderId: order.id, checkoutUrl, requires };
+      return {
+        structuredContent: payload,
+        content: [{ type: "text", text: JSON.stringify(payload) }],
+      };
     },
   );
 

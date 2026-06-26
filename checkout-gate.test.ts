@@ -18,52 +18,60 @@ async function checkout(client: Client, items: { productId: string; quantity: nu
   return client.callTool({ name: "checkout", arguments: { items } });
 }
 
-// SECURITY: the MCP `checkout` tool must not hand an agent a completable checkout
-// link for an age-restricted, unverified cart. Before this gate the tool minted a
-// link unconditionally — enforcement lived only in the web POST. This test fails
-// if the tool regresses to leaking a link for an age-restricted cart.
-describe("checkout MCP tool — age gate returns a verification_required envelope", () => {
+// Consolidated Mode A: the `checkout` tool MINTS the link and SURFACES a `requires`
+// manifest — it is not a completion path (there is no MCP place/settle tool). The
+// age gate is *enforced* on the completion path (POST /checkout/place-order → 403,
+// covered by app.test.ts). This file asserts the tool surfaces the requirement: an
+// alcohol cart yields the age gate in `requires`; a non-alcohol cart does not.
+// Remove the `.when(hasAlcohol)` age gate and the first assertion fails — so the
+// test exercises the control, not just the shape.
+describe("checkout MCP tool — consolidated Mode A manifest", () => {
   beforeEach(async () => {
     setCheckoutBaseUrl("http://localhost:3001");
     await cartStore.write(new Map());
   });
 
-  it("REFUSES an age-restricted cart with a drivable envelope, not a checkout link", async () => {
+  it("age-restricted cart → returns a checkoutUrl AND a requires manifest with the age gate", async () => {
     const client = await connectClient();
     const result = await checkout(client, [{ productId: "oak-whiskey", quantity: 1 }]);
-    const env = result.structuredContent as any;
+    const sc = result.structuredContent as any;
 
-    expect(env._attesto).toBe("verification_required");
-    expect(env.version).toBe("attesto.verification/v1");
-    expect(env.present.credential).toBe("age");
-    expect(env.present.min_age).toBe(21);
-    expect(env.present.approve_url).toContain("/credential-gate/age");
-    expect(env.reason.pass).toBe(false);
-    expect(env.trust_level).toBe("presence-only-demo");
-    // The agent must NOT receive a completable checkout link in this state.
-    expect(env.checkoutUrl).toBeUndefined();
-    const text = (result.content as any[]).find((b) => b.type === "text").text;
-    expect(text.toLowerCase()).toContain("phone");
+    // Mints the link (NOT withheld) — it is inert until the buyer verifies.
+    expect(sc.checkoutUrl).toContain("/checkout?order=");
+    // Not the old blocking envelope.
+    expect(sc._attesto).toBeUndefined();
+
+    // Surfaces the age requirement for the agent.
+    const ageEntry = (sc.requires as any[]).find((e) => e.credential === "age");
+    expect(ageEntry).toBeTruthy();
+    expect(ageEntry.required).toBe(true);
+    expect(ageEntry.effect).toBe("gate");
+    expect(ageEntry.minAge).toBe(21);
+    expect(ageEntry.approveUrl).toContain("/credential-gate/age");
+    // Honesty axes carried through the tool (Principle VII).
+    expect(ageEntry.enforcedAt).toBe("checkout");
+    expect(ageEntry.trust_level).toBe("presence-only-demo");
   });
 
-  it("the per-order approve link binds to the SAME order id in the envelope", async () => {
+  it("the per-order approve link binds to the SAME order id the tool returned", async () => {
     const client = await connectClient();
     const result = await checkout(client, [{ productId: "celebration-champagne", quantity: 2 }]);
-    const env = result.structuredContent as any;
-    const token = new URL(env.present.approve_url).searchParams.get("order")!;
+    const sc = result.structuredContent as any;
+    const ageEntry = (sc.requires as any[]).find((e) => e.credential === "age");
+    const token = new URL(ageEntry.approveUrl).searchParams.get("order")!;
     const order = decodeOrder(token)!;
-    expect(order.id).toBe(env.order.id); // approve link can't be for a different order
+    expect(order.id).toBe(sc.orderId); // approve link can't be for a different order
     expect(order.lines[0].id).toBe("celebration-champagne");
   });
 
-  it("lets a NON-restricted cart through to a normal checkout link (no envelope)", async () => {
+  it("non-alcohol cart → a checkoutUrl with NO age entry in requires", async () => {
     const client = await connectClient();
     const result = await checkout(client, [{ productId: "drift-mouse", quantity: 1 }]);
-    const payload = JSON.parse((result.content as any[]).find((b) => b.type === "text").text);
+    const sc = result.structuredContent as any;
 
-    expect(payload.checkoutUrl).toContain("/checkout?order=");
-    expect((result.structuredContent as any)?._attesto).toBeUndefined();
-    const order = decodeOrder(new URL(payload.checkoutUrl).searchParams.get("order")!)!;
+    expect(sc.checkoutUrl).toContain("/checkout?order=");
+    expect((sc.requires as any[]).find((e) => e.credential === "age")).toBeUndefined();
+    const order = decodeOrder(new URL(sc.checkoutUrl).searchParams.get("order")!)!;
     expect(order.lines[0].id).toBe("drift-mouse");
   });
 });
