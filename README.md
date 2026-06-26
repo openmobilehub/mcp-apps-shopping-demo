@@ -1,4 +1,12 @@
-# Product Picker MCP App
+# Attesto — the consent layer for AI agents
+
+**An [Open Mobile Hub](https://openmobilehub.org) project (Linux Foundation).** An AI agent must prove a
+verifiable credential from the user's phone wallet before a consequential MCP tool completes.
+**Identity leads; payments is one application.**
+
+> **A refused tool call is a protocol, not a wall.** When an agent calls a gated tool and the buyer
+> hasn't proven what's required, the tool returns a typed `verification_required` envelope the agent can
+> *drive* — which credential, a per-order approve link, the tool to poll — instead of a dead error.
 
 <table>
 <tr>
@@ -12,419 +20,199 @@
 <tr>
 <td align="center" width="33%">
 <a href="https://youtube.com/shorts/JA91c2d2DhQ">
-<img src="https://img.youtube.com/vi/JA91c2d2DhQ/hqdefault.jpg" width="280" alt="Demo: Product Picker in the Claude native app"><br>
+<img src="https://img.youtube.com/vi/JA91c2d2DhQ/hqdefault.jpg" width="280" alt="Demo: Claude native app"><br>
 ▶︎ Claude native app
 </a>
 </td>
 <td align="center" width="33%">
 <a href="https://youtube.com/shorts/8rMx5P1AOgI">
-<img src="https://img.youtube.com/vi/8rMx5P1AOgI/hqdefault.jpg" width="280" alt="Demo: Product Picker in ChatGPT"><br>
+<img src="https://img.youtube.com/vi/8rMx5P1AOgI/hqdefault.jpg" width="280" alt="Demo: ChatGPT"><br>
 ▶︎ ChatGPT
 </a>
 </td>
 <td align="center" width="33%">
-<a href="https://youtu.be/MDlyOMIAgYg">
-<img src="https://img.youtube.com/vi/MDlyOMIAgYg/hqdefault.jpg" width="280" alt="Demo: Product Picker in Claude desktop (claude.ai)"><br>
-▶︎ Claude desktop (claude.ai)
-</a>
-</td>
-</tr>
-<tr>
-<td align="center" width="33%">
 <a href="https://youtu.be/qAXgxuihbA8">
-<img src="https://img.youtube.com/vi/qAXgxuihbA8/hqdefault.jpg" width="280" alt="Demo: Utopia Marketplace in Goose, with passkey payment authorization"><br>
+<img src="https://img.youtube.com/vi/qAXgxuihbA8/hqdefault.jpg" width="280" alt="Demo: Goose with passkey payment authorization"><br>
 ▶︎ Goose + passkey checkout
-</a>
-</td>
-<td align="center" width="33%">
-<a href="https://youtu.be/5MXRkNJF824">
-<img src="https://img.youtube.com/vi/5MXRkNJF824/hqdefault.jpg" width="280" alt="Demo: Product Picker in Claude Code (terminal), with passkey payment authorization"><br>
-▶︎ Claude Code + passkey checkout
-</a>
-</td>
-<td align="center" width="33%">
-<a href="https://youtu.be/GmYu-4M5unY">
-<img src="https://img.youtube.com/vi/GmYu-4M5unY/hqdefault.jpg" width="280" alt="Demo: Product Picker in Claude Code (terminal), with Digital Payment Credentials and AP2 checkout"><br>
-▶︎ Claude Code + AP2 checkout
-</a>
-</td>
-</tr>
-<tr>
-<td align="center" width="33%">
-<a href="https://youtu.be/5x47CO54wvI">
-<img src="https://img.youtube.com/vi/5x47CO54wvI/hqdefault.jpg" width="280" alt="Which AI assistants let you add custom connectors: Claude and ChatGPT vs Copilot and Gemini"><br>
-▶︎ Custom connectors: Claude & ChatGPT vs Copilot & Gemini
 </a>
 </td>
 </tr>
 </table>
 
-An **agentic** shopping app built as **one MCP server that runs on every
-surface** — the Claude native app, Claude on the web (claude.ai), Claude
-Desktop, ChatGPT, Goose, and even Claude Code in the terminal. One server, one
-UI bundle: each host renders the same widget natively (or, in a no-GUI host like
-Claude Code, drives the whole flow from chat). The embedded UI is deliberately
-small — it's just the visual part that benefits from being a widget: browse the
-product grid and adjust quantities right on each card. Everything else
-(confirming, asking about products, checkout) is driven by **the agent in
-chat**, not by the iframe.
+---
 
-This mirrors how real Claude/Gemini commerce connectors work: the agent builds
-and edits the cart conversationally but **does not place orders or take
-payment**. Checkout is a hand-off to an external (mock) merchant page where you
-complete the purchase with your own account.
+## What's real today
 
-**Claude CAN** browse and search the catalog, show product details and reviews,
-read the cart, add items, change quantities, and remove items.
-**Claude CANNOT** place orders or take payment — that happens on the merchant
-page.
+This repo is the **reference server** — it runs across Claude (native/web/desktop), ChatGPT, Goose, and
+the Claude Code terminal. The reusable SDK is being **extracted** from it. We're honest about the line:
 
-### The flow
+| | Real, runs today | Status |
+| :-- | :-- | :-- |
+| **The age gate, at the MCP tool layer** | An age-restricted cart returns a `verification_required` envelope from the `checkout` tool — no completable link without proof | ✅ `@openmobilehub/attesto-gate` v0.1 |
+| **Fail-closed mdoc verifier** | OpenID4VP + ISO 18013-5 mDL; requires an explicit `age_over_21 === true` (not token-presence); refuses 18+ for a 21+ gate; nonce-bound | ✅ |
+| **x402 → Hedera settlement** | `npm run lab:settle` settles one real order and prints a HashScan tx | ✅ |
+| **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attesto-storefront` v0.1 (slice) |
+| **Agent-native discovery** | `/.well-known/attesto.json` + `/llms.txt` | ✅ |
+| **mdoc *trust* (issuer/device signatures)** | decode is presence-only — a flow demo, **not a safety control** yet | 🔭 roadmap (Multipaz / `@auth0/mdl`) |
+| **Key-signed AP2 mandate; custom credentials; arbitrary discounts** | — | 🔭 roadmap |
 
-1. **Select** — open the picker and add products with the per-card stepper. Each
-   card reflects the quantity already in your cart; tapping − down to zero (shown
-   as a 🗑) removes the item. Edits update the shared cart immediately.
-2. **Claude confirms** — after you adjust the cart, Claude acknowledges the
-   change, shows the cart total, and asks whether you want to add more or check
-   out.
-3. **Edit by talking** — ask to add/remove items ("drop the webcam", "make it
-   two keyboards"), inspect the cart ("what's in my cart?"), or ask about
-   products ("what do people say about the monitor?"). Claude uses tools to
-   adjust the shared cart and answer.
-4. **Checkout hand-off** — click **Checkout** in the widget (or ask the agent to
-   check out). The agent calls the `checkout` tool, which snapshots the cart into
-   an order and returns a link to the mock merchant page — it never places the
-   order or takes payment itself. The page opens in your browser, where
-   **Authorize payment** runs a real authorization ceremony. Two variants are
-   demoed: a **passkey** (WebAuthn / Touch ID) user-presence proof, and a
-   cross-device **Digital Payment Credentials / AP2** flow where your phone's
-   wallet signs the exact cart total via OpenID4VP (carried phone↔desktop over
-   FIDO caBLE) to produce an AP2 Payment Mandate — see
-   [`payment-gate/README.md`](payment-gate/README.md). Nothing is charged.
+See **[`ROADMAP.md`](ROADMAP.md)** for v0.1 → v0.3.
 
-The UI and the agent share one server-side cart, so anything Claude changes is
-reflected in the picker's cart badge, and anything you add in the picker shows
-up in chat. The cart is kept in-memory locally (lost on server restart); orders
-carry no server state — they're encoded into the checkout link. The checkout
-page is a mock (no real charge), but the **Authorize payment** step on it is a
-real ceremony — passkey user-presence (see
-[`payment-gate/README.md`](payment-gate/README.md)), or the cross-device,
-amount-bound Digital Payment Credentials / AP2 variant where the wallet signs
-over the exact cart total via OpenID4VP, carried phone↔desktop over FIDO caBLE
-(see [`payment-gate/dc-payment/`](payment-gate/dc-payment/README.md)).
+## The two packages
 
-### Age verification & loyalty discount
+Use either alone, or compose them (which is what this demo is).
 
-Some products are age-restricted (alcohol). Age verification and the optional
-loyalty discount happen on the **checkout page** (the link the `checkout` tool
-returns), at the end of the flow:
+### The Gate — `@openmobilehub/attesto-gate`
 
-- If the order contains an age-restricted item, **payment is locked** and a
-  **Verify age** button requests a digital ID (`age_over_21`) via OpenID4VP. The
-  threshold is per product (`minimumAge`), and the check fails closed (requires
-  an explicit positive claim). Responses are bound per request: each one is
-  encrypted to a fresh short-lived key, and a response that echoes a different
-  request's nonce is refused.
-- **Apply loyalty discount** presents a loyalty credential (validated
-  `membership_number`) for 10% off the whole cart.
+Wrap a tool handler so it can't complete until the buyer proves a credential. Today's MCP `checkout`
+tool consumes it:
 
-Verification is **scoped per order** (`product-picker:verification:<orderId>`),
-so on the shared deployment one shopper's verification never affects another's
-checkout. It's cleared when the purchase completes.
+```ts
+import { gated } from "@openmobilehub/attesto-gate";
 
-Set `DEMO_MODE=1` to add an **instant-demo button** to both gate pages — a
-wallet-free fallback (no Chrome 141+ needed) that marks the order verified
-without presenting a credential. It's off by default because it bypasses the
-real check; enable it only on demo deployments.
+const checkout = gated(
+  (args, { order }) => ({ structuredContent: { orderId: order.id, checkoutUrl: linkFor(order) }, content: [/* … */] }),
+  { age: true },
+  {
+    resolveOrder: (args) => buildOrder(args),          // server-side, created once (stable id)
+    isAgeUnverified: (order) => store.isAgeUnverified(order),
+    approveUrl: (order) => `${origin}/credential-gate/age?order=${token(order)}`,
+    minAge: (order) => requiredAge(order),
+  },
+);
+```
+
+Age-restricted + unproven → a `verification_required` envelope; otherwise your handler runs. See
+[`packages/attesto-gate/README.md`](packages/attesto-gate/README.md).
+
+### The Storefront — `@openmobilehub/attesto-storefront`
+
+The catalog-injected cart/pricing/order model an MCP shopping app needs (own-the-code). See
+[`packages/attesto-storefront/README.md`](packages/attesto-storefront/README.md).
+
+## Try it in 2 minutes
+
+**Hosted (no build).** Add `https://mcp-apps-nine.vercel.app/mcp` as a custom connector in Claude
+(Settings → Connectors) or ChatGPT (developer mode), then:
+
+> *"Add the Oak Reserve Whiskey to my cart and check out."*
+
+Because whiskey is 21+, **payment is locked** until you prove `age_over_21` from a wallet on your phone
+([Multipaz Wallet](https://apps.multipaz.org/)), then authorize via passkey or a Digital Payment
+Credential. Nothing is charged.
+
+**Local.**
+
+```bash
+npm install && npm run build
+PORT=3001 node dist/main.js     # MCP server on http://localhost:3001/mcp
+```
+
+> **No wallet handy?** Start with `DEMO_MODE=1` to approve the age check in the browser without one — a
+> quick wallet-free way to see the flow. Off by default (it bypasses the real check).
+
+## Honest status
+
+The verifier enforces **disclosure** (an explicit positive claim) and **binding** (nonce / ephemeral
+key), but **not trust** (issuer/device signatures) — a self-crafted mdoc would pass. The payment mandate
+is AP2-shaped and **dev-signed** (integrity hash), not key-signed. This is **infrastructure meant to be
+trusted**, so we say exactly where the line is: until mdoc trust verification lands, treat the gate as a
+demonstration. The capability exists in **Multipaz** (the OpenWallet Foundation library Google Wallet is
+built on) — it's an integration step, not new cryptography.
+
+## Why it's credible
+
+Ships in **Open Mobile Hub** (Linux Foundation) today, with a path into the **Agentic AI Foundation**.
+Built in collaboration with the **Multipaz** team, and composed entirely from open standards: MCP ·
+W3C Digital Credentials API · OpenID4VP · FIDO caBLE · ISO mdoc / SD-JWT · AP2 · x402.
+
+---
+
+## How the demo works
+
+An **agentic** shopping app built as **one MCP server on every surface**. Each host renders the same
+small widget natively (browse the grid, adjust quantities on the cards); a no-GUI host like Claude Code
+drives the whole flow from chat. The agent builds and edits the cart conversationally but **does not
+place orders or take payment** — checkout is a hand-off to an external (mock) merchant page.
+
+**The flow:** select on the cards → the agent confirms the cart and total → edit by talking ("drop the
+webcam") → **Checkout**, where the agent calls the `checkout` tool. For an age-restricted cart the tool
+returns the `verification_required` envelope; otherwise it returns a link to the mock merchant page,
+where **Authorize payment** runs a real ceremony (passkey user-presence, or a cross-device Digital
+Payment Credentials / AP2 flow where the phone's wallet signs the exact total via OpenID4VP over FIDO
+caBLE). Nothing is charged. See [`payment-gate/README.md`](payment-gate/README.md).
+
+### Age verification & loyalty
+
+Age verification and the optional 10% loyalty discount happen at checkout. An age-restricted order locks
+payment behind a **Verify age** request (`age_over_21` via OpenID4VP; per-product threshold; fail-closed;
+per-request nonce binding). Verification is **scoped per order**
+(`product-picker:verification:<orderId>`) so one shopper's state never affects another's. `DEMO_MODE=1`
+adds a wallet-free instant-demo button (off by default — it bypasses the real check).
 
 ### x402 on-chain settlement
 
-After the passkey gate's four mandate gates pass, the shared completion path
-(`payment-gate/completion.ts`) re-prices the order against the catalog
-(loyalty-aware) and — when the settlement env vars are set — **settles it
-on-chain via the [x402 protocol](https://github.com/coinbase/x402)**. x402 is
-chain-generic (the same facilitator API serves EVM, Solana, and Hedera
-networks); this demo's first settlement rail is **Hedera testnet**: a
-recipient-bound `TransferTransaction` submitted through the
-[blocky402](https://blocky402.com) x402 facilitator, which can only co-sign or
-refuse (payTo and the exact amount live inside the client-signed bytes). The
-receipt shows the amount in ℏ, the payer/merchant accounts, settlement speed,
-and a HashScan link + QR; the agent's order-status result carries the same
-proof into the chat. Settlement **gates completion**: if it is configured and
-fails, the order is authorized-but-not-completed.
-
-Amounts use a micro demo peg (1 USD = 0.0001 ℏ) so faucet credit lasts. By
-default each order is paid by a fresh per-order session wallet whose key never
-outlives the request; set the optional static demo customer to give the buyer
-side one stable HashScan history. Without any `HEDERA_*` env vars the feature is
-off and checkout behaves exactly as before. Env vars, the live-lab script
-(`npm run lab:settle`), and design notes:
+After the passkey gate's four mandate gates pass, `payment-gate/completion.ts` re-prices the order
+against the catalog and — when the settlement env vars are set — **settles on-chain via the
+[x402 protocol](https://github.com/coinbase/x402)** (first rail: Hedera testnet, via the
+[blocky402](https://blocky402.com) facilitator). Settlement **gates completion**: configured-but-failed
+= authorized-but-not-completed. Env vars and the live lab (`npm run lab:settle`):
 [`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md).
 
-## Demo
-
-See it running end to end (browse → edit cart → checkout with Digital Payment
-Credentials → AP2 Payment Mandate):
-
-**Full flow — multi-credential checkout + x402 on-chain settlement** (3 min):
-Claude builds the cart; loyalty + age credentials presented cross-device from a
-phone (selective disclosure); one passkey biometric → x402 settlement in ~4s
-(Hedera testnet); verified on HashScan.
-
-Watch: <https://www.youtube.com/watch?v=biTqHo2dL7M>
-
-More demos:
-
-- **Claude native app:** <https://youtube.com/shorts/JA91c2d2DhQ>
-- **ChatGPT:** <https://youtube.com/shorts/8rMx5P1AOgI>
-- **Claude desktop (claude.ai):** <https://youtu.be/MDlyOMIAgYg>
-- **Goose — passkey checkout:** <https://youtu.be/qAXgxuihbA8>
-- **Claude Code (terminal) — passkey checkout:** <https://youtu.be/5MXRkNJF824>
-- **Claude Code (terminal) — Digital Payment Credentials + AP2:** <https://youtu.be/GmYu-4M5unY>
-- **Custom connectors compared (Claude & ChatGPT vs Copilot & Gemini):** <https://youtu.be/5x47CO54wvI>
-
-## Try the hosted demo
-
-A live instance is already deployed, so you can add it as a custom connector and
-try it **without building or deploying anything**.
-
-**Connector URL:** `https://mcp-apps-nine.vercel.app/mcp`
-
-1. **Claude** (web or desktop): Settings → **Connectors** → **Add custom
-   connector**, paste the URL above, and save. Then ask *"Show me the product
-   picker."* The grid renders inline; add items and adjust quantities on the
-   cards, then click **Checkout** (or ask Claude) to open the mock merchant page.
-2. **ChatGPT**: enable **developer mode**, then add a custom connector/app using
-   the same URL.
-3. **Claude Code (terminal)**: add it as a streamable-HTTP server, then shop and
-   check out without leaving the terminal:
-
-   ```bash
-   claude mcp add --transport http product-picker https://mcp-apps-nine.vercel.app/mcp
-   ```
-4. **Goose** (or any other MCP host): add it as a streamable-HTTP/remote MCP
-   server pointed at the same `/mcp` URL.
-
-Just want to see the UI? Open the standalone browser preview — no host required:
-<https://mcp-apps-nine.vercel.app/mcp-app.html> (loads the sample catalog
-locally; checkout is agent-driven and only works inside an MCP host).
-
-> This is an **authless** demo connector — fine for trying it out, not for
-> production. The cart is demo-global (shared by everyone hitting the same
-> deployment) and resets on redeploys; orders are stateless and the checkout
-> page is a mock (no real charge).
-
-## Build
+## Build & run
 
 ```bash
 npm install
-npm run build
+npm run build        # builds the packages, then bundles the UI + compiles the server
+npm test             # unit tests
 ```
 
-This bundles the React UI into a single `dist/mcp-app.html` and compiles the
-server to `dist/`.
+`npm run build` runs `build:packages` (the `@openmobilehub/attesto-*` workspaces) first, then the app's
+typecheck / UI bundle / server compile.
 
-## Use in Claude Desktop
-
-Add to `claude_desktop_config.json`
-(`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS),
-replacing the path with the absolute path to this project:
+**Claude Desktop (stdio):** add to `claude_desktop_config.json`:
 
 ```json
-{
-  "mcpServers": {
-    "product-picker": {
-      "command": "node",
-      "args": ["/ABSOLUTE/PATH/TO/mcp-apps/dist/main.js", "--stdio"]
-    }
-  }
-}
+{ "mcpServers": { "attesto": { "command": "node", "args": ["/ABSOLUTE/PATH/dist/main.js", "--stdio"] } } }
 ```
 
-Restart Claude Desktop. Then ask: "Show me the product picker." Claude calls
-`browse-products`, the grid renders inline, you pick items and click "Add to
-cart", and Claude takes over in chat to confirm and edit the cart. When you're
-ready, click **Checkout** (or ask Claude) to open the mock merchant page in your
-browser and finish there.
+The mock checkout page is served on port `3030` (override `CHECKOUT_PORT`); in stdio mode it shares the
+process so it shares cart/order state.
 
-The mock checkout page is served over HTTP on port `3030` (override with
-`CHECKOUT_PORT`). In stdio mode this listener starts in the same process so it
-shares the cart/order state.
+**Remote connector (Claude + ChatGPT):** run `PORT=3001 node dist/main.js`, expose it over HTTPS
+(`ngrok http 3001`), and restart with `PUBLIC_BASE_URL` (the public origin the `/mcp` and checkout links
+resolve from) and optionally `ALLOWED_HOSTS`. Add the tunnel's `/mcp` URL as a custom connector.
 
-Product images load from picsum.photos (allowlisted via the resource CSP); if a
-host blocks them, each card falls back to an inline SVG placeholder.
+**Deploy (Vercel):** `api/index.ts` exports the same `createApp()`; `vercel.json` rewrites all paths to
+it and runs `npm run build`. Provision Upstash Redis (`vercel install upstash`) for the shared cart, then
+`vercel deploy --prod`. The checkout link falls back to `VERCEL_PROJECT_PRODUCTION_URL`. Set `DEMO_MODE=1`
+for the wallet-free buttons, and the `HEDERA_*` vars for settlement.
 
-## Use as a remote connector (Claude + ChatGPT)
+> All hosted/tunnel setups are **authless** demo connectors — fine for a demo, not production. The cart
+> is demo-global and resets on redeploys; orders are stateless (encoded into the checkout link).
 
-The same server runs over HTTPS as a remote/custom connector that **both Claude
-and ChatGPT** can add. One origin serves everything: the MCP endpoint at `/mcp`
-and the mock checkout page at `/checkout`. The single UI bundle is registered
-twice — once with the MCP Apps mime (`text/html;profile=mcp-app`) for Claude and
-once with the skybridge mime (`text/html+skybridge`) for ChatGPT — and detects
-its host at runtime (`window.openai` → ChatGPT, top-level/`?standalone` →
-standalone, otherwise an MCP host).
-
-1. **Build and run in HTTP mode** (no `--stdio` flag):
-
-   ```bash
-   npm run build
-   PORT=3001 node dist/main.js
-   ```
-
-2. **Expose it over HTTPS.** Both hosts require an `https://` URL, so tunnel the
-   local port (e.g. with ngrok):
-
-   ```bash
-   ngrok http 3001
-   ```
-
-3. **Point the server at its public origin** so the checkout link resolves from
-   the user's browser instead of localhost. Restart with the tunnel URL:
-
-   ```bash
-   PORT=3001 \
-   PUBLIC_BASE_URL="https://YOUR-TUNNEL.ngrok.app" \
-   ALLOWED_HOSTS="YOUR-TUNNEL.ngrok.app" \
-   node dist/main.js
-   ```
-
-   - `PUBLIC_BASE_URL` is the externally reachable origin both `/mcp` and the
-     checkout link point at. Without it the `checkout` tool returns a
-     `localhost` URL that won't open for a remote user.
-   - `ALLOWED_HOSTS` (comma-separated) enables the transport's DNS-rebinding
-     guard for the tunnel host. Omit it for a quick local test.
-
-4. **Add the connector in each host**, using the tunnel's `/mcp` URL
-   (`https://YOUR-TUNNEL.ngrok.app/mcp`):
-   - **Claude:** Settings → Connectors → add a custom connector.
-   - **ChatGPT:** enable developer mode, then add it as a custom connector/app.
-
-This is an **authless** demo connector — fine for a demo, not for production.
-The cart is in-memory and shared across both hosts hitting the same server (it
-resets on restart); orders are stateless, encoded into the checkout link.
-
-> **Note:** the ChatGPT side uses a `window.openai` bridge whose exact surface is
-> still evolving. All ChatGPT-specific calls are optional-chained, but the widget
-> behavior should be **verified live in ChatGPT developer mode** — it has not been
-> exhaustively confirmed against the current Apps SDK.
-
-## Deploy to Vercel
-
-The server also runs on Vercel as a single serverless function, which gives you
-a stable HTTPS origin without running a tunnel. `api/index.ts` exports the same
-Express app (`createApp()`), and `vercel.json` rewrites every path to it, so one
-function serves both `/mcp` and `/checkout`.
-
-Serverless functions don't keep module memory between invocations, so the two
-pieces of shared state are handled differently:
-
-- **Cart** — persisted through a `CartStore`. Locally (and in stdio mode) it's an
-  in-memory store with zero dependencies; on Vercel it uses Upstash Redis when
-  the connection env vars are present. Without Redis the cart would appear to
-  reset between requests, so Redis is required for the deployed app to behave.
-- **Orders** — stateless. The `checkout` tool encodes the order into the checkout
-  URL (base64url), so the merchant page reconstructs it from the link with no
-  store at all.
-
-1. **Provision Upstash Redis.** From the project directory:
-
-   ```bash
-   vercel install upstash
-   ```
-
-   This adds the Upstash integration and auto-syncs the connection env vars
-   (`KV_REST_API_URL` / `KV_REST_API_TOKEN`, or the `UPSTASH_REDIS_REST_URL` /
-   `UPSTASH_REDIS_REST_TOKEN` pair) into the project. `selectCartStore` picks the
-   Redis store automatically when it sees them.
-
-2. **Deploy:**
-
-   ```bash
-   vercel deploy --prod
-   ```
-
-   Vercel runs `npm run build` (per `vercel.json`), which bundles the UI into
-   `dist/mcp-app.html` and compiles the server. The UI bundle is shipped with the
-   function via `includeFiles: dist/**`.
-
-3. **No `PUBLIC_BASE_URL` needed.** The checkout link falls back to
-   `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel injects automatically, so the
-   link points at the deployment's own origin. Set `PUBLIC_BASE_URL` only if you
-   want to override it (e.g. a custom domain). `ALLOWED_HOSTS` is optional and
-   off by default. Set `DEMO_MODE=1` if the deployment should offer the
-   wallet-free instant-demo buttons on the age/loyalty gate pages. To enable
-   on-chain settlement, add the `HEDERA_*` vars (see
-   [`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md)).
-
-4. **Add the connector** in Claude (or ChatGPT) using the deployment's `/mcp`
-   URL — `https://YOUR-PROJECT.vercel.app/mcp`.
-
-Like the tunnel setup, this is an **authless** demo connector. The cart lives in
-Redis and is demo-global (shared across everyone hitting the deployment); orders
-carry no server state.
-
-## Preview in the browser
-
-The UI normally talks to the MCP host over a `postMessage` bridge. When opened
-directly in a browser it detects there is no host and runs in **standalone
-mode**: it loads the sample catalog locally, and "Add to cart" accumulates a
-local cart shown in the footer badge. Checkout is agent-driven and only works
-inside an MCP host, so standalone mode is for iterating on the selection UI
-itself — no Claude Desktop required.
-
-```bash
-npm run dev   # opens http://localhost:5173/mcp-app.html
-```
-
-Standalone mode triggers automatically outside an iframe; append `?standalone`
-to force it.
-
-## Develop / inspect
-
-```bash
-npm test                                                        # unit tests
-npx @modelcontextprotocol/inspector node dist/main.js --stdio   # inspect tools/resources
-```
+**Preview the UI only:** `npm run dev` opens `http://localhost:5173/mcp-app.html` in standalone mode
+(sample catalog, local cart; checkout is agent-driven and only works inside an MCP host).
 
 ## Project layout
 
-- `server.ts` — MCP server + shared cart (read/written through `cartStore`).
-  Tools: `browse-products` (opens the UI), `add-to-cart` / `set-quantity` /
-  `remove-from-cart` / `get-cart` / `checkout` (model- and UI-callable, linked to
-  the UI so chat-driven edits route back to the open picker),
-  `get-product-details` / `get-product-reviews` (model-only info). `checkout`
-  snapshots the cart into an order and returns `{ orderId, checkoutUrl }`; it does
-  not place the order or take payment. The UI bundle is registered as two
-  resources — the MCP Apps mime for Claude and a `text/html+skybridge` resource
-  for ChatGPT — and tools carry both `ui.resourceUri` and `openai/outputTemplate`
-  meta plus tool `annotations`.
-- `cartStore.ts` — `CartStore` abstraction for the shared cart. `MemoryCartStore`
-  (in-process, zero deps) for local/stdio use; `RedisCartStore` (Upstash) for
-  serverless. `selectCartStore` picks Redis when the connection env vars are set,
-  else memory.
-- `checkout.ts` — stateless orders + the mock checkout HTML page and its HTTP
-  listener (`startCheckoutHttpServer`, default port `3030`). `createCheckoutOrder`
-  encodes the order into the checkout URL (base64url, via `encodeOrder`);
-  `checkoutResponse` decodes it (`decodeOrder`) to render the page — no order
-  store. Used by both the standalone listener and the `/checkout` route.
-- `app.ts` — `createApp()` builds the Express app serving `/mcp` and `/checkout`
-  from one origin (no `listen()`), reused by both `main.ts` and the Vercel
-  function.
-- `main.ts` — stdio (Claude Desktop) and HTTP entrypoints; calls `createApp()`
-  and listens locally, and starts the checkout listener in stdio mode
-- `api/index.ts` / `vercel.json` — Vercel serverless entrypoint (`export default
-  createApp()`) and config that rewrites all paths to the one function
-- `payment-gate/completion.ts` — the passkey path's single completion helper:
-  gates → idempotency → catalog re-pricing → optional x402 settlement → order
-  record; settlement failure blocks completion
-- `payment-gate/hedera-settlement/` — recipient-bound x402 settlement via the
-  blocky402 facilitator, currently on Hedera testnet (config / transfer /
-  wallet / facilitator / settle / lab)
-- `payment-gate/qr.ts` — SVG QR endpoint for the receipt, locked to
-  hashscan.io URLs
-- `catalog.ts` — sample products + reviews + `priceCart` / `createOrder` /
-  `getProduct` / `getReviews` helpers
-- `src/app.tsx` — React selection UI with a footer Checkout button; one bundle
-  with runtime host detection for three modes: MCP host (Claude), ChatGPT
-  (`window.openai` bridge), and standalone browser preview
-- `mcp-app.html` / `vite.config.ts` — single-file UI bundle
+- `packages/attesto-gate/` — **the Gate**: `gated()`, the `verification_required` envelope, the
+  credential model. The app consumes it.
+- `packages/attesto-storefront/` — **the Storefront** (slice): catalog-injected `priceCart` / `createOrder`.
+- `server.ts` — MCP server + the 9 shopping tools (`browse-products`, `add-to-cart`, …, `checkout`,
+  `get-order-status`). `checkout` is gated.
+- `checkout.ts` — stateless orders + the mock checkout page; `createOrderForCheckout` / `checkoutUrlForOrder`.
+- `app.ts` / `main.ts` / `api/index.ts` — Express app (`/mcp` + `/checkout` + discovery), entrypoints, Vercel.
+- `attesto-discovery.ts` — `/.well-known/attesto.json` + `/llms.txt`.
+- `catalog.ts` — sample products + pricing helpers. `cartStore.ts` / `orderStore.ts` / `verificationStore.ts` — state.
+- `payment-gate/` — credential gate (OpenID4VP/mdoc), passkey & DC-payment gates, AP2 mandate, x402/Hedera settlement.
+- `src/app.tsx` / `mcp-app.html` — the single-file React widget (runtime host detection: Claude / ChatGPT / standalone).
+
+## Deeper docs
+
+- **Design & DX** (on the `docs/attesto-design` branch): `GETTING_STARTED.md`, `OVERVIEW.md`,
+  `DECISIONS.md`, and the compiler-checked API spec in `docs/attesto-sdk/`.
+- **Payments:** [`payment-gate/README.md`](payment-gate/README.md) and
+  [`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md).
+
+Apache-2.0.
