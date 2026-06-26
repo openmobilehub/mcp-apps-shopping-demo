@@ -99,6 +99,7 @@ PRs get both automated and human review:
   an admin merge.
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Active Spec Kit feature: **Attesto SDK v0.1**. For technologies, project structure, and the constitution
+check, read the plan: `specs/001-attesto-sdk/plan.md` (with `spec.md`, `research.md`, `data-model.md`,
+`contracts/attesto-gate.api.md`, `quickstart.md`). Governance: `.specify/memory/constitution.md` (v1.0.0).
 <!-- SPECKIT END -->
