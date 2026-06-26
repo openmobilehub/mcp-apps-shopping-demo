@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
@@ -18,5 +18,12 @@ export default defineConfig({
     },
     outDir: "dist",
     emptyOutDir: false,
+  },
+  // The repo carries local git worktrees under .worktrees/ (gitignored). Vitest
+  // still scans the filesystem, so without this it runs duplicate copies of every
+  // test — inflating counts and surfacing cross-copy flakiness. Scope tests to the
+  // main tree.
+  test: {
+    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
   },
 });

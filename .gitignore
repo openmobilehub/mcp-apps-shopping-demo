@@ -6,3 +6,7 @@ dist/
 
 # Local git worktrees
 .worktrees/
+
+# Tooling scratch
+.superpowers/
+.DS_Store
