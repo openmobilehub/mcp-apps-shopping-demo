@@ -65,8 +65,11 @@ The shiny core, **real and `npm`-installable.** Two packages, extracted from the
 - **Arbitrary discounts** — `discount({ percent | amount | items })` — generalize Gate 1 while keeping
   amount-binding in agreement across all payment paths.
 - **`onProven()`** handler effect (loyalty points, gifts, fraud-review flags).
-- **Claude skill `attesto-gate-my-tool`** — a coding agent wires the gate into an existing MCP server in
-  one shot.
+- **Claude skill `attesto-gate-my-tool`** — tell your coding agent *"gate my checkout tool"* and it
+  installs Attesto into your existing MCP server in one shot: reads the `registerTool` handler, wraps it
+  with `requirements(...)`, calls `mount(app)`, adds the security-bypass test. The runtime half it relies
+  on (`llms.txt` + `/.well-known/attesto.json`) already ships in v0.1, so an agent can wire it from the
+  docs today — this packages it as one command. The agent-native adoption lever.
 - **Real AP2 mandate signing** (SD-JWT KB-JWT) replacing the dev signer.
 
 ---
