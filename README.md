@@ -41,23 +41,6 @@ verifiable credential from the user's phone wallet before a consequential MCP to
 
 ---
 
-## What's real today
-
-This repo is the **reference server** — it runs across Claude (native/web/desktop), ChatGPT, Goose, and
-the Claude Code terminal. The reusable SDK is being **extracted** from it. We're honest about the line:
-
-| | Real, runs today | Status |
-| :-- | :-- | :-- |
-| **The age gate, at the MCP tool layer** | An age-restricted cart returns a `verification_required` envelope from the `checkout` tool — no completable link without proof | ✅ `@openmobilehub/attesto-gate` v0.1 |
-| **Fail-closed mdoc verifier** | OpenID4VP + ISO 18013-5 mDL; requires an explicit `age_over_21 === true` (not token-presence); refuses 18+ for a 21+ gate; nonce-bound | ✅ |
-| **x402 → Hedera settlement** | `npm run lab:settle` settles one real order and prints a HashScan tx | ✅ |
-| **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attesto-storefront` v0.1 (slice) |
-| **Agent-native discovery** | `/.well-known/attesto.json` + `/llms.txt` | ✅ |
-| **mdoc *trust* (issuer/device signatures)** | decode is presence-only — a flow demo, **not a safety control** yet | 🔭 roadmap (Multipaz / `@auth0/mdl`) |
-| **Key-signed AP2 mandate; custom credentials; arbitrary discounts** | — | 🔭 roadmap |
-
-See **[`ROADMAP.md`](ROADMAP.md)** for v0.1 → v0.3.
-
 ## The two packages
 
 Use either alone, or compose them (which is what this demo is).
@@ -110,6 +93,23 @@ PORT=3001 node dist/main.js     # MCP server on http://localhost:3001/mcp
 
 > **No wallet handy?** Start with `DEMO_MODE=1` to approve the age check in the browser without one — a
 > quick wallet-free way to see the flow. Off by default (it bypasses the real check).
+
+## What's real today
+
+This repo is the **reference server** — it runs across Claude (native/web/desktop), ChatGPT, Goose, and
+the Claude Code terminal. The reusable SDK is being **extracted** from it. We're honest about the line:
+
+| | Real, runs today | Status |
+| :-- | :-- | :-- |
+| **The age gate, at the MCP tool layer** | An age-restricted cart returns a `verification_required` envelope from the `checkout` tool — no completable link without proof | ✅ `@openmobilehub/attesto-gate` v0.1 |
+| **Fail-closed mdoc verifier** | OpenID4VP + ISO 18013-5 mDL; requires an explicit `age_over_21 === true` (not token-presence); refuses 18+ for a 21+ gate; nonce-bound | ✅ |
+| **x402 → Hedera settlement** | `npm run lab:settle` settles one real order and prints a HashScan tx | ✅ |
+| **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attesto-storefront` v0.1 (slice) |
+| **Agent-native discovery** | `/.well-known/attesto.json` + `/llms.txt` | ✅ |
+| **mdoc *trust* (issuer/device signatures)** | decode is presence-only — a flow demo, **not a safety control** yet | 🔭 roadmap (Multipaz / `@auth0/mdl`) |
+| **Key-signed AP2 mandate; custom credentials; arbitrary discounts** | — | 🔭 roadmap |
+
+See **[`ROADMAP.md`](ROADMAP.md)** for v0.1 → v0.3.
 
 ## Honest status
 
