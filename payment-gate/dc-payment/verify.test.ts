@@ -1,15 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { buildTransactionData, encodeTransactionData, hashTransactionData } from "./txData.js";
 import { sealReaderContext } from "./readerContext.js";
 import { buildVpToken, encryptToReaderKey } from "./fixtures.js";
 import { verifyDcPresentation } from "./verify.js";
 
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
+
 const secret = "test-gate-secret";
 const origin = { rpID: "localhost", origin: "http://localhost:3030" };
 
 async function setup(opts: { tamperToken?: boolean } = {}) {
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-VF01");
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-VF01", FIXTURE);
   const txDataB64 = encodeTransactionData(buildTransactionData(order, origin));
   const expected = hashTransactionData(txDataB64);
   const hashBytes = new Uint8Array(Buffer.from(opts.tamperToken ? hashTransactionData("different") : expected, "base64url"));

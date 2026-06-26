@@ -2,9 +2,13 @@
 // Ed25519-signed recipient-bound TransferTransaction end to end. Opt-in only —
 // needs a funded testnet operator (portal.hedera.com faucet) and hits the real
 // network. Run: npm run lab:settle
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { hederaSettlementConfig } from "./config.js";
 import { settleOrder } from "./settle.js";
+
+const LAB_CATALOG: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
 
 async function main() {
   const config = hederaSettlementConfig(process.env);
@@ -20,7 +24,7 @@ async function main() {
   console.log("facilitator /supported:", JSON.stringify(supported, null, 2));
   console.log(`using feePayer ${config.feePayer} — confirm it matches the hedera:testnet signer above.\n`);
 
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], `LAB-${Math.random().toString(36).slice(2, 8)}`);
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], `LAB-${Math.random().toString(36).slice(2, 8)}`, LAB_CATALOG);
   console.log(`settling order ${order.id} — $${order.total} → tinybar via demo peg…`);
   const record = await settleOrder(order, config);
   console.log("\nSETTLED ✓");

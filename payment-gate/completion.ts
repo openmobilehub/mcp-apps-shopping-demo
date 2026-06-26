@@ -6,6 +6,7 @@
 // authorized-but-not-completed (no record, cart intact).
 import type { Order } from "../catalog.js";
 import { createOrder } from "../catalog.js";
+import { ensureCatalogLoaded, getCatalog } from "../catalog-store.js";
 import { orderStore, type CompletedOrder, type SettlementRecord } from "../orderStore.js";
 import { cartStore } from "../cartStore.js";
 import { verificationStore } from "../verificationStore.js";
@@ -62,9 +63,11 @@ export async function completeOrder(
   // verification says it was applied — a token merely claiming the discounted
   // total reprices higher and is refused.
   const verification = await verificationStore.read(input.order.id);
+  await ensureCatalogLoaded();
   const repriced = createOrder(
     input.order.lines.map((l) => ({ productId: l.id, quantity: l.quantity })),
     input.order.id,
+    getCatalog(),
     { loyaltyApplied: verification.loyalty.applied },
   );
   if (repriced.total !== input.order.total) return { completed: false, reason: "reprice" };

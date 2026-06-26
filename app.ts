@@ -4,6 +4,7 @@ import cors from "cors";
 import type { Express, Request, Response } from "express";
 import { createServer } from "./server.js";
 import { checkoutResponse, decodeOrder, demoCompletedOrder, isAgeUnverified, setCheckoutBaseUrl } from "./checkout.js";
+import { ensureCatalogLoaded, getCatalog } from "./catalog-store.js";
 import { orderStore } from "./orderStore.js";
 import { cartStore } from "./cartStore.js";
 import { registerPasskeyGate } from "./payment-gate/passkey/routes.js";
@@ -34,6 +35,15 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
     });
   }
 
+  app.get("/catalog", async (_req: Request, res: Response) => {
+    try {
+      await ensureCatalogLoaded();
+      res.json(getCatalog());
+    } catch {
+      res.status(503).json({ error: "catalog unavailable" });
+    }
+  });
+
   app.get("/checkout", async (req: Request, res: Response) => {
     const token = typeof req.query.order === "string" ? req.query.order : undefined;
     // Age verification + loyalty happen on this page (end of flow). Read the
@@ -46,6 +56,7 @@ export function createApp({ publicBaseUrl, allowedHosts }: AppOptions): Express 
     // A revisited checkout for an already-completed order shows the paid state
     // (checkoutResponse matches on orderId) instead of re-offering payment.
     const completed = decoded ? await orderStore.read() : null;
+    await ensureCatalogLoaded();
     const { status, html } = checkoutResponse(
       token,
       { ageVerified: v.ageVerified, loyaltyApplied: v.loyalty.applied },

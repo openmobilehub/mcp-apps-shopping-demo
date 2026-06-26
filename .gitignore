@@ -3,6 +3,16 @@ dist/
 *.log
 .vercel
 .env*.local
+.env
+
+# Firebase / GCP service-account keys — never commit these
+serviceAccount*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+gcp-key*.json
+
+# IDE
+.idea/
 
 # Local git worktrees
 .worktrees/

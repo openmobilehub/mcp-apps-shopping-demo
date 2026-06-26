@@ -1,13 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { createOrder, type Order } from "../../catalog.js";
+import { createOrder, type Order, type Product } from "../../catalog.js";
 import { buildTransactionData, encodeTransactionData, hashTransactionData } from "./txData.js";
 import { buildVpToken } from "./fixtures.js";
 import { buildDcMandate, runDcGates } from "./mandate.js";
 
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
+
 const origin = { rpID: "localhost", origin: "http://localhost:3030" };
 
 function consistent(): { mandate: ReturnType<typeof buildDcMandate>; order: Order; txDataB64: string } {
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-MD01");
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-MD01", FIXTURE);
   const txDataB64 = encodeTransactionData(buildTransactionData(order, origin));
   const hashBytes = new Uint8Array(Buffer.from(hashTransactionData(txDataB64), "base64url"));
   const vpStr = buildVpToken({ txHashBytes: hashBytes, instrumentId: "pi-77AABBCC" });

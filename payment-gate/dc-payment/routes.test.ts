@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import * as jose from "jose";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { encodeOrder } from "../../checkout.js";
 import { cartStore } from "../../cartStore.js";
 import { orderStore } from "../../orderStore.js";
@@ -10,12 +10,20 @@ import { buildTransactionData, encodeTransactionData, hashTransactionData } from
 import { sealReaderContext } from "./readerContext.js";
 import { buildVpToken, encryptToReaderKey } from "./fixtures.js";
 import { registerDcPaymentGate } from "./routes.js";
+import { setCatalogLoader, __resetCatalogStoreForTest } from "../../catalog-store.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
 
 let app: express.Express;
-const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT01");
+const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT01", FIXTURE);
 const token = encodeOrder(order);
 
 beforeAll(() => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
   process.env.GATE_SECRET = "routes-test-secret";
   app = express();
   registerDcPaymentGate(app);

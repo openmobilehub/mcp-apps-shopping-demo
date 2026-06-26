@@ -9,7 +9,7 @@ import { buildMdocRequestParts, sealMdocContext } from "./mdoc-iso.js";
 import { renderCredentialPage } from "./page.js";
 import type { CredentialKind } from "./dcql.js";
 import { decodeOrder } from "../../checkout.js";
-import { requiredAgeForLines } from "../../catalog.js";
+import { ensureCatalogLoaded, requiredAgeForLines } from "../../catalog-store.js";
 
 // Decode the order token the gate URL carries. Both the age threshold and the
 // verification key are derived from it, so the gate is always scoped to one order.
@@ -98,6 +98,7 @@ export function registerCredentialGate(app: Express): void {
       return;
     }
     try {
+      await ensureCatalogLoaded();
       const minimumAge = kind === "age" ? requiredAgeFromOrder(order) : undefined;
       const secret = gateSecret();
       // Dispatch by the protocol the wallet actually used.

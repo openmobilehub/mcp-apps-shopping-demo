@@ -1,19 +1,27 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { encodeOrder } from "../../checkout.js";
 import { sealMdocContext, generateReaderKey, buildEncryptionInfo } from "./mdoc-iso.js";
 import { registerCredentialGate } from "./routes.js";
+import { setCatalogLoader, __resetCatalogStoreForTest } from "../../catalog-store.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "craft-beer-sampler", name: "Craft Beer Sampler", price: 48, currency: "USD", image: "x", category: "Beverages", description: "d", minimumAge: 21 },
+];
 
 let app: express.Express;
 const SECRET = "cred-gate-routes-test-secret";
 
 // craft-beer-sampler is age-restricted (minimumAge: 21), giving us a real age gate to exercise.
-const order = createOrder([{ productId: "craft-beer-sampler", quantity: 1 }], "ORD-CG01");
+const order = createOrder([{ productId: "craft-beer-sampler", quantity: 1 }], "ORD-CG01", FIXTURE);
 const orderToken = encodeOrder(order);
 
 beforeAll(() => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
   process.env.GATE_SECRET = SECRET;
   app = express();
   registerCredentialGate(app);

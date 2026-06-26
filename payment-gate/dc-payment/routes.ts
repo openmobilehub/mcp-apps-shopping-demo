@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response } from "express";
 import { decodeOrder, isAgeUnverified } from "../../checkout.js";
+import { ensureCatalogLoaded } from "../../catalog-store.js";
 import { cartStore } from "../../cartStore.js";
 import { orderStore } from "../../orderStore.js";
 import { verificationStore } from "../../verificationStore.js";
@@ -53,6 +54,7 @@ export function registerDcPaymentGate(app: Express): void {
       return;
     }
     try {
+      await ensureCatalogLoaded();
       const origin = originOf(req);
       const { mandate, gates } = await verifyDcPresentation({ order, origin, result, readerContextToken, secret: gateSecret() });
       // Server-side age gate — refuse to complete an age-restricted order that

@@ -12,13 +12,12 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import {
   CART_META_KEY,
-  CATALOG,
   CATALOG_META_KEY,
-  getProduct,
   getReviews,
   priceCart,
   type PricedCart,
 } from "./catalog.js";
+import { ensureCatalogLoaded, getCatalog, getProduct } from "./catalog-store.js";
 import { createCheckoutOrder, getCheckoutBaseUrl } from "./checkout.js";
 import { cartStore } from "./cartStore.js";
 import { orderStore } from "./orderStore.js";
@@ -114,14 +113,16 @@ function cartResult(priced: PricedCart): CallToolResult {
 // not here, so the cart carries no verification state.
 function priceFrom(cart: Map<string, number>): PricedCart {
   const items = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
-  return priceCart(items);
+  return priceCart(items, getCatalog());
 }
 
 async function readPriced(): Promise<PricedCart> {
+  await ensureCatalogLoaded();
   return priceFrom(await cartStore.read());
 }
 
 async function setQuantity(productId: string, quantity: number): Promise<PricedCart> {
+  await ensureCatalogLoaded();
   const cart = await cartStore.read();
   if (quantity <= 0) cart.delete(productId);
   else cart.set(productId, quantity);
@@ -132,6 +133,7 @@ async function setQuantity(productId: string, quantity: number): Promise<PricedC
 // Adds quantities on top of what's already in the cart (the picker's
 // "Add to cart" commits a batch; the agent can add items by id too).
 async function addToCart(items: { productId: string; quantity: number }[]): Promise<PricedCart> {
+  await ensureCatalogLoaded();
   const cart = await cartStore.read();
   for (const { productId, quantity } of items) {
     if (quantity <= 0) continue;
@@ -142,6 +144,7 @@ async function addToCart(items: { productId: string; quantity: number }[]): Prom
 }
 
 async function removeFromCart(productId: string): Promise<PricedCart> {
+  await ensureCatalogLoaded();
   const cart = await cartStore.read();
   cart.delete(productId);
   await cartStore.write(cart);
@@ -179,7 +182,7 @@ export function createServer(): McpServer {
           {
             type: "text",
             text:
-              `Opened the product picker with ${CATALOG.length} products. The picker is selection-only — ` +
+              `Opened the product picker with ${getCatalog().length} products. The picker is selection-only — ` +
               `the user adds items there (or asks you to). You drive the rest in chat.\n` +
               `You CAN: browse and search the catalog, show product details and reviews, read the cart, ` +
               `add items, change quantities, and remove items.\n` +
@@ -199,9 +202,9 @@ export function createServer(): McpServer {
               `Use get-product-details and get-product-reviews to answer questions about items.`,
           },
         ],
-        structuredContent: { products: CATALOG, cart: priced },
+        structuredContent: { products: getCatalog(), cart: priced },
         _meta: {
-          [CATALOG_META_KEY]: { products: CATALOG },
+          [CATALOG_META_KEY]: { products: getCatalog() },
           [CART_META_KEY]: priced,
         },
       };
@@ -305,6 +308,7 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ productId }): Promise<CallToolResult> => {
+      await ensureCatalogLoaded();
       const product = getProduct(productId);
       if (!product) {
         return {
@@ -327,6 +331,7 @@ export function createServer(): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ productId }): Promise<CallToolResult> => {
+      await ensureCatalogLoaded();
       const product = getProduct(productId);
       if (!product) {
         return {
@@ -386,7 +391,7 @@ export function createServer(): McpServer {
           isError: true,
         };
       }
-      const { orderId, checkoutUrl } = createCheckoutOrder(entries);
+      const { orderId, checkoutUrl } = await createCheckoutOrder(entries);
       return {
         structuredContent: { orderId, checkoutUrl },
         content: [{ type: "text", text: JSON.stringify({ orderId, checkoutUrl }) }],

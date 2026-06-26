@@ -1,15 +1,35 @@
-import { describe, it, expect } from "vitest";
-import { CATALOG, createOrder } from "./catalog.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createOrder, type Product } from "./catalog.js";
 import {
   createCheckoutOrder,
   encodeOrder,
   decodeOrder,
   checkoutResponse,
 } from "./checkout.js";
+import { setCatalogLoader, ensureCatalogLoaded, __resetCatalogStoreForTest } from "./catalog-store.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "aurora-headphones", name: "Aurora Wireless Headphones", price: 199, currency: "USD", image: "x", category: "Audio", description: "d" },
+  { id: "nimbus-keyboard", name: "Nimbus Mechanical Keyboard", price: 129, currency: "USD", image: "x", category: "Accessories", description: "d" },
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+  { id: "celebration-champagne", name: "Celebration Champagne Gift Set", price: 89, currency: "USD", image: "x", category: "Beverages", description: "d", minimumAge: 21 },
+  { id: "oak-whiskey", name: "Oak Reserve Whiskey Collection", price: 124, currency: "USD", image: "x", category: "Beverages", description: "d", minimumAge: 21 },
+];
+const CATALOG = FIXTURE;
+
+beforeEach(async () => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
+  await ensureCatalogLoaded();
+});
+afterEach(() => {
+  __resetCatalogStoreForTest();
+});
 
 describe("encodeOrder / decodeOrder", () => {
   it("round-trips an order", () => {
-    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-ABC123");
+    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-ABC123", CATALOG);
     const decoded = decodeOrder(encodeOrder(order));
     expect(decoded).toEqual(order);
   });
@@ -20,8 +40,8 @@ describe("encodeOrder / decodeOrder", () => {
 });
 
 describe("createCheckoutOrder", () => {
-  it("returns an ORD- id and a checkout URL whose token decodes to the order", () => {
-    const { orderId, checkoutUrl } = createCheckoutOrder([
+  it("returns an ORD- id and a checkout URL whose token decodes to the order", async () => {
+    const { orderId, checkoutUrl } = await createCheckoutOrder([
       { productId: CATALOG[0].id, quantity: 2 },
     ]);
     expect(orderId).toMatch(/^ORD-[0-9A-F]{6}$/);
@@ -32,9 +52,9 @@ describe("createCheckoutOrder", () => {
     expect(order?.lines.map((l) => l.id)).toEqual([CATALOG[0].id]);
   });
 
-  it("mints a new id for each order", () => {
-    const a = createCheckoutOrder([{ productId: CATALOG[0].id, quantity: 1 }]);
-    const b = createCheckoutOrder([{ productId: CATALOG[0].id, quantity: 1 }]);
+  it("mints a new id for each order", async () => {
+    const a = await createCheckoutOrder([{ productId: CATALOG[0].id, quantity: 1 }]);
+    const b = await createCheckoutOrder([{ productId: CATALOG[0].id, quantity: 1 }]);
     expect(a.orderId).not.toBe(b.orderId);
   });
 });
@@ -67,9 +87,9 @@ describe("checkoutResponse", () => {
     expect(status).toBe(404);
   });
 
-  it("renders the order page from an encoded token", () => {
+  it("renders the order page from an encoded token", async () => {
     const [a, b] = CATALOG;
-    const { checkoutUrl, orderId } = createCheckoutOrder([
+    const { checkoutUrl, orderId } = await createCheckoutOrder([
       { productId: a.id, quantity: 2 },
       { productId: b.id, quantity: 1 },
     ]);
@@ -89,7 +109,7 @@ describe("checkoutResponse", () => {
 
 describe("checkout page authorization affordance", () => {
   it("offers a primary x402 Hedera passkey link to the passkey gate and keeps the instant mock Place order button", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO01");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO01", CATALOG);
     const { status, html } = checkoutResponse(encodeOrder(order));
     expect(status).toBe(200);
     expect(html).toContain("/payment-gate/passkey?order=");
@@ -98,7 +118,7 @@ describe("checkout page authorization affordance", () => {
   });
 
   it("presents the methods as a Shopify-style payment-method group with one Pay CTA", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO04");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO04", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order));
     expect(html).toContain("Payment method");
     // Three selectable methods in one radio group…
@@ -112,7 +132,7 @@ describe("checkout page authorization affordance", () => {
   });
 
   it("shows a paid banner and withholds payment methods once this order is completed", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PAID1");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PAID1", CATALOG);
     const completed = {
       orderId: "ORD-PAID1",
       mandateId: "mandate_pm_x",
@@ -146,7 +166,7 @@ describe("checkout page authorization affordance", () => {
 
   it("a paid revisit of a discounted order shows the discounted total once (banner and table agree)", () => {
     // Two units of a $69 item = $138 subtotal; loyalty makes it $124.20.
-    const order = createOrder([{ productId: "drift-mouse", quantity: 2 }], "ORD-PAIDDISC", { loyaltyApplied: true });
+    const order = createOrder([{ productId: "drift-mouse", quantity: 2 }], "ORD-PAIDDISC", CATALOG, { loyaltyApplied: true });
     const completed = {
       orderId: "ORD-PAIDDISC",
       mandateId: "mandate_pm_d",
@@ -167,7 +187,7 @@ describe("checkout page authorization affordance", () => {
   });
 
   it("ignores a completed order for a DIFFERENT order id (still payable)", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PAID2");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PAID2", CATALOG);
     const other = {
       orderId: "ORD-OTHER",
       mandateId: "m",
@@ -185,14 +205,14 @@ describe("checkout page authorization affordance", () => {
 
   it("locked payment hides the whole method group, not just the buttons", () => {
     const alcohol = CATALOG.find((p) => p.minimumAge != null)!;
-    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-CO05");
+    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-CO05", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order), { ageVerified: false });
     expect(html).not.toContain('type="radio" name="pm"');
     expect(html).not.toContain("/payment-gate/dc-payment?order=");
   });
 
   it("offers a secondary cross-device link to the DC payment gate", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO02");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-CO02", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order));
     expect(html).toContain("/payment-gate/dc-payment?order=");
     expect(html).toContain("cross-device");
@@ -201,14 +221,14 @@ describe("checkout page authorization affordance", () => {
 
 describe("checkout page loyalty (end of flow)", () => {
   it("offers an Apply loyalty discount link when loyalty is not yet applied", () => {
-    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-DISC02");
+    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-DISC02", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order), { loyaltyApplied: false });
     expect(html).toContain("/credential-gate/loyalty?order=");
     expect(html).toContain("Apply loyalty discount");
   });
 
   it("shows the discount line and total once loyalty is applied", () => {
-    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-DISC03");
+    const order = createOrder([{ productId: CATALOG[0].id, quantity: 2 }], "ORD-DISC03", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order), { loyaltyApplied: true });
     expect(html).toContain("Loyalty discount");
     expect(html).toMatch(/-\s*\$/); // negative discount amount rendered
@@ -219,7 +239,7 @@ describe("checkout page age gating (end of flow)", () => {
   const alcohol = CATALOG.find((p) => p.minimumAge != null)!;
 
   it("locks payment and offers a Verify age link when alcohol is unverified", () => {
-    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-AGE01");
+    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-AGE01", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order), { ageVerified: false });
     expect(html).toContain("/credential-gate/age?order=");
     expect(html).toContain("Verify age");
@@ -228,7 +248,7 @@ describe("checkout page age gating (end of flow)", () => {
   });
 
   it("unlocks payment once age is verified", () => {
-    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-AGE02");
+    const order = createOrder([{ productId: alcohol.id, quantity: 1 }], "ORD-AGE02", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order), { ageVerified: true });
     expect(html).toContain("Age verified");
     expect(html).toContain("/payment-gate/passkey?order=");
@@ -236,7 +256,7 @@ describe("checkout page age gating (end of flow)", () => {
   });
 
   it("does not gate a cart without alcohol", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-AGE03");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-AGE03", CATALOG);
     const { html } = checkoutResponse(encodeOrder(order));
     expect(html).not.toContain("Verify age");
     expect(html).toContain("/payment-gate/passkey?order=");

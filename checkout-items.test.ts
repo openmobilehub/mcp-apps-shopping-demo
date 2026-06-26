@@ -1,8 +1,23 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { decodeOrder } from "./checkout.js";
 import { cartStore } from "./cartStore.js";
+import { setCatalogLoader, __resetCatalogStoreForTest } from "./catalog-store.js";
+import { type Product } from "./catalog.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "aurora-headphones", name: "Aurora Wireless Headphones", price: 199, currency: "USD", image: "x", category: "Audio", description: "d" },
+];
+
+beforeEach(() => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
+});
+afterEach(() => {
+  __resetCatalogStoreForTest();
+});
 
 function rpcResult(text: string): any {
   const line = text.split("\n").find((l) => l.startsWith("data: "))!;

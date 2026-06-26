@@ -1,8 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { PrivateKey } from "@hashgraph/sdk";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import type { HederaSettlementConfig } from "./config.js";
 import { settleOrder } from "./settle.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
 
 const config: HederaSettlementConfig = {
   operatorId: "0.0.1001",
@@ -26,7 +31,7 @@ function deps(overrides: Partial<Parameters<typeof settleOrder>[2]> = {}) {
 
 function order(total = 42) {
   // drift-mouse exists in the catalog; the id is what matters here.
-  const o = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-SETTLE1");
+  const o = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-SETTLE1", FIXTURE);
   return { ...o, total, lines: o.lines };
 }
 

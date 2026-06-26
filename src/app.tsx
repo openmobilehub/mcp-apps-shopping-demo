@@ -5,7 +5,6 @@ import { StrictMode, useCallback, useEffect, useMemo, useRef, useState } from "r
 import { createRoot } from "react-dom/client";
 import {
   CART_META_KEY,
-  CATALOG,
   CATALOG_META_KEY,
   priceCart as priceCartLocal,
   type CartItemInput,
@@ -107,11 +106,11 @@ function emptyCart(): PricedCart {
 // Recompute a priced cart with one product set to an absolute quantity (0
 // removes). Used for optimistic UI: the stepper updates instantly, then the
 // server's authoritative cart reconciles when the tool call returns.
-function withQuantity(cart: PricedCart, productId: string, quantity: number): PricedCart {
+function withQuantity(cart: PricedCart, productId: string, quantity: number, catalog: Product[]): PricedCart {
   const items: CartItemInput[] = cart.lines.map((l) => ({ productId: l.id, quantity: l.quantity }));
   const filtered = items.filter((i) => i.productId !== productId);
   if (quantity > 0) filtered.push({ productId, quantity });
-  return priceCartLocal(filtered);
+  return priceCartLocal(filtered, catalog);
 }
 
 type CompletedOrder = {
@@ -204,11 +203,11 @@ Drive the experience in chat: confirm the cart and ask whether to add more or ch
 // ----- Host mode: connects to the MCP host bridge -----
 
 function HostApp() {
-  // Seed with the bundled catalog so a widget opened by a cart-only tool (e.g.
-  // get-cart, which doesn't carry the catalog) renders products immediately
-  // instead of getting stuck on "Loading products…". browse-products' _meta
-  // overwrites this with the same static list.
-  const [products, setProducts] = useState<Product[]>(CATALOG);
+  // Products are seeded from the first browse-products response; until then
+  // the picker shows "Loading products…". cart-only tools (get-cart etc.) do
+  // not carry the catalog so the empty seed is intentional — the model is
+  // expected to call browse-products before the user starts picking.
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<PricedCart>(emptyCart());
   const [insets, setInsets] = useState<Insets>();
   const [confirmedOrder, setConfirmedOrder] = useState<CompletedOrder | null>(null);
@@ -251,17 +250,39 @@ function HostApp() {
     },
   });
 
+  // Actively pull the catalog once connected. A same-origin fetch('/catalog')
+  // doesn't work here — the widget runs in the host's sandboxed iframe, so a
+  // relative URL hits the host origin, not our server. browse-products is a
+  // read-only server tool; calling it through the bridge returns the catalog
+  // (in structuredContent/_meta) regardless of how the host delivers the
+  // opening result.
+  useEffect(() => {
+    if (!app) return;
+    let cancelled = false;
+    app
+      .callServerTool({ name: "browse-products", arguments: {} })
+      .then((result) => {
+        if (cancelled) return;
+        const meta = result?._meta?.[CATALOG_META_KEY] as { products?: Product[] } | undefined;
+        const sc = (result as { structuredContent?: { products?: Product[] } } | undefined)?.structuredContent;
+        const list = meta?.products ?? sc?.products;
+        if (Array.isArray(list)) setProducts(list);
+      })
+      .catch(() => { /* fall back to ontoolresult _meta from agent-driven calls */ });
+    return () => { cancelled = true; };
+  }, [app]);
+
   const setQuantity = useCallback<SetQuantityFn>(async (productId, quantity) => {
     if (!appRef.current) return;
     setConfirmedOrder(null); // editing the cart starts a new order
-    applyCart(withQuantity(cartRef.current, productId, quantity)); // optimistic
+    applyCart(withQuantity(cartRef.current, productId, quantity, products)); // optimistic
     const result = await appRef.current.callServerTool({
       name: "set-quantity",
       arguments: { productId, quantity },
     });
     const parsed = parseJsonContent<PricedCart>(result);
     if (parsed) applyCart(parsed); // authoritative
-  }, [applyCart]);
+  }, [applyCart, products]);
 
   // Hand off to checkout: snapshot the cart into an order (server side) and open
   // the returned merchant URL in the browser. The agent does not place the order
@@ -316,7 +337,7 @@ function HostApp() {
 
 function ChatGptApp() {
   const oai = window.openai!;
-  const [products, setProducts] = useState<Product[]>(CATALOG);
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<PricedCart>(emptyCart());
   const [confirmedOrder, setConfirmedOrder] = useState<CompletedOrder | null>(null);
 
@@ -336,12 +357,23 @@ function ChatGptApp() {
     return () => window.removeEventListener("openai:set_globals", onGlobals);
   }, [applyToolOutput]);
 
+  // Actively pull the catalog on mount via the bridge, in case toolOutput hasn't
+  // populated yet (a relative fetch('/catalog') would hit ChatGPT's origin, not
+  // our server). browse-products is read-only and returns { products, cart }.
+  useEffect(() => {
+    let cancelled = false;
+    oai.callTool?.("browse-products", {})
+      .then((result) => { if (!cancelled) applyToolOutput(structuredOf(result)); })
+      .catch(() => { /* toolOutput / set_globals will still seed it */ });
+    return () => { cancelled = true; };
+  }, [oai, applyToolOutput]);
+
   const setQuantity = useCallback<SetQuantityFn>(async (productId, quantity) => {
     setConfirmedOrder(null); // editing the cart starts a new order
-    setCart((prev) => withQuantity(prev, productId, quantity)); // optimistic
+    setCart((prev) => withQuantity(prev, productId, quantity, products)); // optimistic
     const result = await oai.callTool?.("set-quantity", { productId, quantity });
     applyToolOutput(structuredOf(result)); // authoritative
-  }, [oai, applyToolOutput]);
+  }, [oai, applyToolOutput, products]);
 
   const pollRef = useRef<{ cancelled: boolean } | null>(null);
   useEffect(() => () => { if (pollRef.current) pollRef.current.cancelled = true; }, []);
@@ -375,17 +407,27 @@ function ChatGptApp() {
 // Checkout is agent-driven and only available inside an MCP host.
 
 function StandaloneApp() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<PricedCart>(emptyCart());
   const qtys = useRef(new Map<string, number>());
+
+  // In standalone mode (plain browser, no agent), seed products from the
+  // server's /catalog endpoint if available; otherwise the grid stays empty.
+  useEffect(() => {
+    fetch("/catalog")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (Array.isArray(data)) setProducts(data as Product[]); })
+      .catch(() => {}); // no catalog endpoint in dev; silent
+  }, []);
 
   const setQuantity = useCallback<SetQuantityFn>(async (productId, quantity) => {
     if (quantity <= 0) qtys.current.delete(productId);
     else qtys.current.set(productId, quantity);
     const all = [...qtys.current.entries()].map(([productId, quantity]) => ({ productId, quantity }));
-    setCart(priceCartLocal(all));
-  }, []);
+    setCart(priceCartLocal(all, products));
+  }, [products]);
 
-  return <Picker products={CATALOG} cart={cart} setQuantity={setQuantity} />;
+  return <Picker products={products} cart={cart} setQuantity={setQuantity} />;
 }
 
 // ----- Selection UI (the only thing that lives in the iframe) -----

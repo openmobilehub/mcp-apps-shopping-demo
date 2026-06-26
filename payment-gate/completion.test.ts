@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createOrder } from "../catalog.js";
+import { createOrder, type Product } from "../catalog.js";
 import { orderStore, type SettlementRecord } from "../orderStore.js";
 import { cartStore } from "../cartStore.js";
 import { verificationStore } from "../verificationStore.js";
 import { completeOrder } from "./completion.js";
+import { setCatalogLoader, __resetCatalogStoreForTest } from "../catalog-store.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
 
 const HEDERA_ENV = {
   HEDERA_OPERATOR_ID: "0.0.1001",
@@ -29,7 +35,7 @@ const settlement: SettlementRecord = {
 };
 
 function input(gates = [passGate], id = "ORD-C1") {
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], id);
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], id, FIXTURE);
   return {
     order,
     mandateId: "mandate_pm_c1",
@@ -42,6 +48,8 @@ function input(gates = [passGate], id = "ORD-C1") {
 }
 
 beforeEach(async () => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
   await orderStore.clear();
   await cartStore.write(new Map([["drift-mouse", 1]]));
 });
@@ -108,6 +116,7 @@ describe("completeOrder", () => {
     const discounted = createOrder(
       base.order.lines.map((l) => ({ productId: l.id, quantity: l.quantity })),
       "ORD-LOY1",
+      FIXTURE,
       { loyaltyApplied: true },
     );
     const out = await completeOrder({ ...base, order: discounted }, { settle, env: {} as NodeJS.ProcessEnv });
@@ -121,6 +130,7 @@ describe("completeOrder", () => {
     const discounted = createOrder(
       base.order.lines.map((l) => ({ productId: l.id, quantity: l.quantity })),
       "ORD-LOY2",
+      FIXTURE,
       { loyaltyApplied: true },
     );
     const out = await completeOrder({ ...base, order: discounted }, { settle, env: HEDERA_ENV });

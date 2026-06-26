@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { decodeOrder, isAgeUnverified } from "../../checkout.js";
+import { ensureCatalogLoaded } from "../../catalog-store.js";
 import { deriveOrigin } from "../origin.js";
 import { completeOrder } from "../completion.js";
 import { gateSecret } from "../challengeToken.js";
@@ -60,6 +61,7 @@ export function registerPasskeyGate(app: Express): void {
       return;
     }
     try {
+      await ensureCatalogLoaded();
       const origin = originOf(req);
       const authenticator = await verifyPasskeyAssertion({ response, challengeToken, origin, secret: gateSecret() });
       const mandate = buildPasskeyMandate({ order, authenticator, origin });

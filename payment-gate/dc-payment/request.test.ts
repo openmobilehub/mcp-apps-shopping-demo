@@ -1,14 +1,19 @@
 import { describe, it, expect } from "vitest";
 import * as jose from "jose";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { buildSignedRequest } from "./request.js";
 import { openReaderContext } from "./readerContext.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
 
 const secret = "test-gate-secret";
 
 describe("buildSignedRequest", () => {
   it("returns a signed request JWT bound to the order amount, and a sealed reader context", async () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 2 }], "ORD-REQ01");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 2 }], "ORD-REQ01", FIXTURE);
     const origin = { rpID: "localhost", origin: "http://localhost:3030" };
     const { request, readerContextToken } = await buildSignedRequest(order, origin, secret);
 
@@ -32,7 +37,7 @@ describe("buildSignedRequest", () => {
   });
 
   it("derives the client_id SAN from the request host", async () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-REQ02");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-REQ02", FIXTURE);
     const origin = { rpID: "mcp-apps-nine.vercel.app", origin: "https://mcp-apps-nine.vercel.app" };
     const { request } = await buildSignedRequest(order, origin, secret);
     expect((jose.decodeJwt(request) as any).client_id).toBe("x509_san_dns:mcp-apps-nine.vercel.app");

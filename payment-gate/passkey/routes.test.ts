@@ -1,12 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../../app.js";
 import { encodeOrder } from "../../checkout.js";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
+import { setCatalogLoader, __resetCatalogStoreForTest } from "../../catalog-store.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
+
+beforeEach(() => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => FIXTURE);
+});
+afterEach(() => {
+  __resetCatalogStoreForTest();
+});
 
 function appWithOrderToken() {
   const app = createApp({ publicBaseUrl: "http://localhost:3001" });
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT01");
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT01", FIXTURE);
   return { app, token: encodeOrder(order) };
 }
 
@@ -27,7 +41,7 @@ describe("passkey gate routes", () => {
 
   it("GET /payment-gate/passkey with a decodable token but bad currency → 404 (not 500)", async () => {
     const app = createApp({ publicBaseUrl: "http://localhost:3001" });
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT02");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-RT02", FIXTURE);
     const token = encodeOrder({ ...order, currency: "NOPE", lines: order.lines.map((l) => ({ ...l, currency: "NOPE" })) });
     const res = await request(app).get(`/payment-gate/passkey?order=${token}`);
     expect(res.status).toBe(404);

@@ -337,7 +337,25 @@ pieces of shared state are handled differently:
    `UPSTASH_REDIS_REST_TOKEN` pair) into the project. `selectCartStore` picks the
    Redis store automatically when it sees them.
 
-2. **Deploy:**
+2. **Configure the Firestore catalog.** The product catalog is stored in Firestore
+   and read server-side via the Firebase Admin SDK (5-minute TTL cache). Add these
+   env vars to your Vercel project (`vercel env add` or the dashboard):
+
+   - `FIREBASE_PROJECT_ID` — Firebase/GCP project id
+   - `FIREBASE_CLIENT_EMAIL` — service-account client email
+   - `FIREBASE_PRIVATE_KEY` — service-account private key (in Vercel, newlines
+     escaped as `\n`)
+
+   For local seeding you can instead point `GOOGLE_APPLICATION_CREDENTIALS` at a
+   downloaded service-account JSON key (the project id is read from the key), e.g.
+   `GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json npm run seed:catalog`.
+
+   If Firestore is unreachable on a cold cache, pricing/checkout fails closed
+   (errors) rather than serving an empty catalog. Deploy the security rules once
+   with `firebase deploy --only firestore:rules` (or paste `firestore.rules` into
+   the Firebase console), and seed the catalog with `npm run seed:catalog`.
+
+3. **Deploy:**
 
    ```bash
    vercel deploy --prod
@@ -347,7 +365,7 @@ pieces of shared state are handled differently:
    `dist/mcp-app.html` and compiles the server. The UI bundle is shipped with the
    function via `includeFiles: dist/**`.
 
-3. **No `PUBLIC_BASE_URL` needed.** The checkout link falls back to
+4. **No `PUBLIC_BASE_URL` needed.** The checkout link falls back to
    `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel injects automatically, so the
    link points at the deployment's own origin. Set `PUBLIC_BASE_URL` only if you
    want to override it (e.g. a custom domain). `ALLOWED_HOSTS` is optional and
@@ -356,7 +374,7 @@ pieces of shared state are handled differently:
    on-chain settlement, add the `HEDERA_*` vars (see
    [`payment-gate/hedera-settlement/README.md`](payment-gate/hedera-settlement/README.md)).
 
-4. **Add the connector** in Claude (or ChatGPT) using the deployment's `/mcp`
+5. **Add the connector** in Claude (or ChatGPT) using the deployment's `/mcp`
    URL — `https://YOUR-PROJECT.vercel.app/mcp`.
 
 Like the tunnel setup, this is an **authless** demo connector. The cart lives in

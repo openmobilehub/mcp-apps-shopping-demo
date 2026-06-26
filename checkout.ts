@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { createOrder, requiredAgeForLines, LOYALTY_DISCOUNT_PCT, type CartItemInput, type Order, type PriceOpts } from "./catalog.js";
+import { createOrder, LOYALTY_DISCOUNT_PCT, type CartItemInput, type Order, type PriceOpts } from "./catalog.js";
+import { ensureCatalogLoaded, getCatalog, requiredAgeForLines } from "./catalog-store.js";
 import type { CompletedOrder } from "./orderStore.js";
 import { verificationStore } from "./verificationStore.js";
 
@@ -9,6 +10,7 @@ import { verificationStore } from "./verificationStore.js";
 // write the order when it returns true. Returns true iff the order contains an
 // age-restricted item AND this order has no recorded age verification.
 export async function isAgeUnverified(order: Order): Promise<boolean> {
+  await ensureCatalogLoaded();
   if (requiredAgeForLines(order.lines) == null) return false;
   const v = await verificationStore.read(order.id);
   return !v.ageVerified;
@@ -73,11 +75,12 @@ export function decodeOrder(token: string): Order | undefined {
 
 // Snapshots cart items into an order and returns its id plus the URL of the mock
 // checkout page. The order itself rides in the URL's `order` token.
-export function createCheckoutOrder(
+export async function createCheckoutOrder(
   items: CartItemInput[],
   opts: PriceOpts = {},
-): { orderId: string; checkoutUrl: string } {
-  const order = createOrder(items, nextOrderId(), opts);
+): Promise<{ orderId: string; checkoutUrl: string }> {
+  await ensureCatalogLoaded();
+  const order = createOrder(items, nextOrderId(), getCatalog(), opts);
   const token = encodeOrder(order);
   return { orderId: order.id, checkoutUrl: `${checkoutBaseUrl}/checkout?order=${token}` };
 }

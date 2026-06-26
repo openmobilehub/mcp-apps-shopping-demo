@@ -5,6 +5,25 @@ import { orderStore } from "./orderStore.js";
 import { cartStore } from "./cartStore.js";
 import { createCheckoutOrder } from "./checkout.js";
 import { RESOURCE_URI, SKYBRIDGE_URI } from "./server.js";
+import { setCatalogLoader, ensureCatalogLoaded, __resetCatalogStoreForTest } from "./catalog-store.js";
+import { type Product } from "./catalog.js";
+
+// Fixture catalog covering all product ids referenced by this test file.
+const APP_FIXTURE: Product[] = [
+  { id: "aurora-headphones", name: "Aurora Wireless Headphones", price: 199, currency: "USD", image: "x", category: "Audio", description: "d" },
+  { id: "nimbus-keyboard", name: "Nimbus Mechanical Keyboard", price: 129, currency: "USD", image: "x", category: "Accessories", description: "d" },
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+  { id: "celebration-champagne", name: "Celebration Champagne Gift Set", price: 89, currency: "USD", image: "x", category: "Beverages", description: "d", minimumAge: 21 },
+];
+
+beforeEach(async () => {
+  __resetCatalogStoreForTest();
+  setCatalogLoader(async () => APP_FIXTURE);
+  await ensureCatalogLoaded();
+});
+afterEach(() => {
+  __resetCatalogStoreForTest();
+});
 
 describe("createApp", () => {
   it("serves the checkout page on /checkout with a valid order token", async () => {
@@ -50,7 +69,7 @@ describe("createApp", () => {
     await orderStore.clear();
     await cartStore.write(new Map([["aurora-headphones", 1]]));
 
-    const { orderId, checkoutUrl } = createCheckoutOrder([
+    const { orderId, checkoutUrl } = await createCheckoutOrder([
       { productId: "aurora-headphones", quantity: 1 },
     ]);
     const token = new URL(checkoutUrl).searchParams.get("order")!;
@@ -127,7 +146,7 @@ import { createOrder } from "./catalog.js";
 const ALCOHOL = "celebration-champagne";
 
 function orderToken(id: string, productId = ALCOHOL): string {
-  return encodeOrder(createOrder([{ productId, quantity: 1 }], id));
+  return encodeOrder(createOrder([{ productId, quantity: 1 }], id, APP_FIXTURE));
 }
 const co = (token: string) => `/checkout?order=${encodeURIComponent(token)}`;
 
@@ -263,5 +282,59 @@ describe("checkout resets verification", () => {
     // age-restricted item is gated again.
     const fresh = orderToken("ORD-RESET2");
     expect((await request(app).get(co(fresh))).text).toContain("Payment is locked");
+  });
+});
+
+describe("GET /catalog", () => {
+  it("GET /catalog returns the loaded products as JSON", async () => {
+    __resetCatalogStoreForTest();
+    const fixture: Product[] = [
+      { id: "coffee", name: "Coffee", price: 12, currency: "USD", image: "x", category: "Grocery", description: "d" },
+    ];
+    setCatalogLoader(async () => fixture);
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const res = await request(app).get("/catalog");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(fixture);
+  });
+
+  it("GET /catalog returns 503 when the catalog cannot load", async () => {
+    __resetCatalogStoreForTest();
+    setCatalogLoader(async () => { throw new Error("firestore down"); });
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const res = await request(app).get("/catalog");
+    expect(res.status).toBe(503);
+  });
+
+  it("GET /catalog returns 503 for an empty collection (fails closed, not blank)", async () => {
+    __resetCatalogStoreForTest();
+    setCatalogLoader(async () => []);
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const res = await request(app).get("/catalog");
+    expect(res.status).toBe(503);
+  });
+});
+
+describe("cold-cache age gate (place-order must 403, not 500)", () => {
+  demoMode();
+
+  it("rejects an age-restricted order with 403 (not 500) when catalog cache is cold", async () => {
+    // Reset to cold state, then install a loader WITHOUT pre-warming the cache.
+    // This simulates a cold start or post-TTL state where ensureCatalogLoaded()
+    // has not been called yet. Without the `await ensureCatalogLoaded()` guard in
+    // isAgeUnverified, requiredAgeForLines calls getCatalog() which throws, and
+    // place-order returns 500 instead of a clean 403.
+    __resetCatalogStoreForTest();
+    setCatalogLoader(async () => APP_FIXTURE); // includes celebration-champagne w/ minimumAge: 21
+
+    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const token = orderToken("ORD-COLD"); // champagne, no age verification recorded
+
+    const res = await request(app).post("/checkout/place-order").send({ order: token });
+    // The age gate must fire cleanly (fail-closed 403), not blow up (500).
+    expect(res.status).toBe(403);
+    // The order must not have been recorded.
+    const status = await request(app).get(`/checkout/order-status?orderId=ORD-COLD`);
+    expect(status.body.completed).toBe(false);
   });
 });

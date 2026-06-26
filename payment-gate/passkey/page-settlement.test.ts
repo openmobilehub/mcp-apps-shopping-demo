@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { createOrder } from "../../catalog.js";
+import { createOrder, type Product } from "../../catalog.js";
 import { encodeOrder } from "../../checkout.js";
 import { renderPasskeyPage } from "./page.js";
 
+// Fixture catalog covering all product ids referenced by this test file.
+const FIXTURE: Product[] = [
+  { id: "drift-mouse", name: "Drift Ergonomic Mouse", price: 69, currency: "USD", image: "x", category: "Accessories", description: "d" },
+];
+
 describe("passkey page settlement beat", () => {
   it("ships the settling-status and settlement-render hooks to the client", () => {
-    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PG1");
+    const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-PG1", FIXTURE);
     const html = renderPasskeyPage({ order, orderToken: encodeOrder(order) });
     // The client script must show an honest in-flight state and render both
     // terminal settlement states from the verify response.

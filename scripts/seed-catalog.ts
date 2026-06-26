@@ -1,0 +1,120 @@
+import { getDb } from "../firebase-admin.js";
+import type { Product } from "../catalog.js";
+
+const PRODUCTS: Product[] = [
+  {
+    id: "aurora-headphones",
+    name: "Aurora Wireless Headphones",
+    price: 199.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/aurora-headphones/400/300",
+    category: "Audio",
+    description: "Over-ear ANC headphones with 40h battery life.",
+  },
+  {
+    id: "nimbus-keyboard",
+    name: "Nimbus Mechanical Keyboard",
+    price: 129.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/nimbus-keyboard/400/300",
+    category: "Accessories",
+    description: "Hot-swappable 75% keyboard with PBT keycaps.",
+  },
+  {
+    id: "lumen-monitor",
+    name: 'Lumen 27" 4K Monitor',
+    price: 449.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/lumen-monitor/400/300",
+    category: "Displays",
+    description: "27-inch 4K IPS display with USB-C power delivery.",
+  },
+  {
+    id: "drift-mouse",
+    name: "Drift Ergonomic Mouse",
+    price: 69.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/drift-mouse/400/300",
+    category: "Accessories",
+    description: "Lightweight wireless mouse with silent clicks.",
+  },
+  {
+    id: "pulse-webcam",
+    name: "Pulse 1080p Webcam",
+    price: 89.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/pulse-webcam/400/300",
+    category: "Video",
+    description: "1080p60 webcam with auto light correction.",
+  },
+  {
+    id: "harbor-dock",
+    name: "Harbor USB-C Dock",
+    price: 159.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/harbor-dock/400/300",
+    category: "Accessories",
+    description: "11-in-1 dock: dual HDMI, Ethernet, SD, 100W passthrough.",
+  },
+  {
+    id: "ember-desk-lamp",
+    name: "Ember Smart Desk Lamp",
+    price: 59.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/ember-desk-lamp/400/300",
+    category: "Lighting",
+    description: "Tunable white LED lamp with wireless charging base.",
+  },
+  {
+    id: "atlas-stand",
+    name: "Atlas Laptop Stand",
+    price: 49.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/atlas-stand/400/300",
+    category: "Accessories",
+    description: "Aluminum adjustable laptop stand, folds flat.",
+  },
+  {
+    id: "celebration-champagne",
+    name: "Celebration Champagne Gift Set",
+    price: 89.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/celebration-champagne/400/300",
+    category: "Beverages",
+    description: "Brut champagne duo with two crystal flutes. 21+ only.",
+    minimumAge: 21,
+  },
+  {
+    id: "oak-whiskey",
+    name: "Oak Reserve Whiskey Collection",
+    price: 124.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/oak-whiskey/400/300",
+    category: "Beverages",
+    description: "Trio of small-batch aged whiskeys. 21+ only.",
+    minimumAge: 21,
+  },
+  {
+    id: "craft-beer-sampler",
+    name: "Craft Beer Sampler",
+    price: 48.0,
+    currency: "USD",
+    image: "https://picsum.photos/seed/craft-beer-sampler/400/300",
+    category: "Beverages",
+    description: "Twelve-can sampler of regional craft brews. 21+ only.",
+    minimumAge: 21,
+  },
+];
+
+async function main() {
+  const db = getDb();
+  const col = db.collection("products");
+  for (const p of PRODUCTS) {
+    const { id, ...fields } = p;
+    await col.doc(id).set(fields, { merge: true }); // idempotent upsert by id
+    console.log(`seeded ${id}`);
+  }
+  console.log(`done — ${PRODUCTS.length} products`);
+}
+
+main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
