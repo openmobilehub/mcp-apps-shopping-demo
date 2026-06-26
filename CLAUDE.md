@@ -101,5 +101,5 @@ PRs get both automated and human review:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/001-attesto-sdk/plan.md
+at specs/002-attesto-storefront/plan.md
 <!-- SPECKIT END -->
