@@ -39,7 +39,9 @@ export function attestoManifest(baseUrl: string): AttestoManifest {
       {
         kind: "age",
         status: "enforced",
-        detail: "Age-restricted carts return a verification_required envelope from the checkout tool.",
+        detail:
+          "Age-restricted carts surface an `age` gate in the checkout tool's `requires` manifest; the gate " +
+          "is enforced on the completion path (place-order → 403), not by withholding the link.",
         accepts: ["org.iso.18013.5.1.mDL", "eu.europa.ec.eudi.pid.1"],
         min_age: 21,
         trust_level: "presence-only-demo",
@@ -71,14 +73,23 @@ Attesto is the consent layer for AI agents: a consequential MCP tool completes o
 after the buyer proves a verifiable credential from their phone wallet. Identity
 leads; payments is one application.
 
-## When the \`checkout\` tool returns a verification_required result
-A result whose structuredContent has \`_attesto == "verification_required"\` is NOT an
-error — it is a consent handshake you drive:
-1. Read \`present.approve_url\` and surface it to the user as a clickable link, verbatim.
-2. Say WHICH credential is needed (e.g. age_over_21) and WHY (an age-restricted item).
-3. Do NOT claim the order is placed. The buyer must prove it on their own phone.
-4. Poll \`resume.tool\` (\`get-order-status\`) until it reports completion, then confirm
-   the order id, total, and any on-chain settlement receipt.
+## What the \`checkout\` tool returns (consolidated Mode A)
+The tool ALWAYS returns a \`checkoutUrl\`, plus a \`requires\` manifest — a list of what the
+buyer must do on the page, e.g. \`{ credential: "age", effect: "gate", minAge: 21, approveUrl }\`.
+Drive it:
+1. Surface \`checkoutUrl\` to the user as a clickable link, verbatim.
+2. Tell them what \`requires\` lists (e.g. "you'll verify age 21+ and pay on the page").
+3. Do not claim the order is placed. The buyer completes it on their own device.
+4. Poll \`get-order-status\` until it reports completion, then confirm the order id, total,
+   and any on-chain settlement receipt.
+The link is inert until the buyer verifies — the gate is enforced on the completion path,
+not by withholding the link.
+
+## Page-less gated tools (Mode B)
+A gated tool with no checkout page instead returns a \`verification_required\` envelope
+(\`structuredContent._attesto == "verification_required"\`) — NOT an error. Drive it the same
+way: surface \`present.approve_url\`, say which credential and why, do not claim the order is
+placed, then poll \`resume.tool\` (\`get-order-status\`).
 
 ## What you CANNOT do
 - You cannot place the order or take payment — that is the buyer's act, on their device.

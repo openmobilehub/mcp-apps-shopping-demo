@@ -20,11 +20,16 @@ The shiny core, **real and `npm`-installable.** Two packages, extracted from the
 
 ### `@openmobilehub/attesto-gate`
 
-- **`mountGate(app, { rpId })`** — mounts the wallet-ceremony routes (OpenID4VP + W3C Digital Credentials
-  API), bound to your origin with nonce/replay protection.
-- **`gated(handler, policy)`** — wraps an MCP tool handler. When a required credential isn't met, it
-  returns a typed **`verification_required`** envelope (the agent-drivable refusal: *why* it stopped,
-  *which* credential, a per-order approve link, the tool to poll) instead of completing.
+- **`new Attesto({ walletOrigin })` + `attesto.mount(app)`** — configure once; `mount` wires the
+  wallet-ceremony seam (OpenID4VP + W3C Digital Credentials API) and the per-order verification store,
+  bound to your origin with nonce/replay protection.
+- **`attesto.requirements(order, policy)`** — resolves an ordered `required(…)` / `optional(…)` policy of
+  typed builders (`age.over(21)` / `membership.discount(10)` / `payment.in("usd")`, conditional via
+  `.when()`) to a flat, serializable **`requires`** manifest. This is the code→data boundary — functions
+  never cross the wire.
+- **`gated(handler, policy)`** — the page-less / blocking variant (Mode B): returns a typed
+  **`verification_required`** envelope (the agent-drivable refusal: *which* credential, a per-order approve
+  link, the tool to poll) instead of completing.
 - **Three built-in credentials, from the get-go:**
   - **`age`** — fail-closed ISO 18013-5 mdoc verifier. Enforces **disclosure** (explicit
     `age_over_21 === true`, never token-presence) and **binding** (nonce; refuses replay). Correct
@@ -32,9 +37,13 @@ The shiny core, **real and `npm`-installable.** Two packages, extracted from the
   - **`membership`** — loyalty discount (10% in v0.1, matching the engine).
   - **`payment`** — single-use, **AP2-shaped** mandate bound to merchant + amount, on the passkey /
     Digital-Credentials paths; settled via **x402** (Hedera testnet today, `npm run lab:settle`).
-- The `verification_required` envelope **wired into the MCP `checkout` tool** — closes today's gap where
-  the tool mints a link unconditionally.
-- **Enforced server-side on every completion path,** with security-bypass tests.
+- The MCP `checkout` tool **wired in consolidated Mode A** — it mints the link **and** surfaces the
+  `requires` manifest of what the page will ask for (it is not a completion path).
+- **Enforced server-side on every completion path** (`place-order` → 403, the passkey / DC-payment
+  `/verify` handlers), with security-bypass tests.
+- **`defineCredential()` + `dcql()`** — define a custom credential (any mdoc / SD-JWT claim) with a
+  `gate()` / `discount()` / `authorize()` effect and drop `required(it)` into the same policy. The
+  extension point ships with one worked example (a `prescription` gate).
 - **`llms.txt` + `/.well-known/attesto.json`** — so a calling agent discovers and drives the gate, and a
   build-time agent can wire it in.
 
@@ -59,9 +68,9 @@ The shiny core, **real and `npm`-installable.** Two packages, extracted from the
 
 ## v0.2 — "make it yours"
 
-- **`defineCredential()` + `dcql()` + `requireCredential` / `optionalCredential`** — custom credential
-  types (prescription, military, company, passport, healthcare — anything expressible as an mdoc /
-  SD-JWT claim). The "add your own gate" story, real.
+- **A credential library beyond the worked example** — the `defineCredential()` extension point ships in
+  v0.1 with a `prescription` gate; v0.2 adds more real-world packs (military, company, passport,
+  healthcare — anything expressible as an mdoc / SD-JWT claim).
 - **Arbitrary discounts** — `discount({ percent | amount | items })` — generalize Gate 1 while keeping
   amount-binding in agreement across all payment paths.
 - **`onProven()`** handler effect (loyalty points, gifts, fraud-review flags).

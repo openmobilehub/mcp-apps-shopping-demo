@@ -4,9 +4,10 @@
 verifiable credential from the user's phone wallet before a consequential MCP tool completes.
 **Identity leads; payments is one application.**
 
-> **A refused tool call is a protocol, not a wall.** When an agent calls a gated tool and the buyer
-> hasn't proven what's required, the tool returns a typed `verification_required` envelope the agent can
-> *drive* — which credential, a per-order approve link, the tool to poll — instead of a dead error.
+> **A refused tool call is a protocol, not a wall.** A gated tool tells the agent exactly what the buyer
+> must prove — which credential, a per-order approve link, the tool to poll — instead of a dead error. A
+> page-less tool returns a typed `verification_required` envelope the agent *drives*; a tool with a
+> checkout page surfaces the same as a `requires` manifest beside the link, and enforces at completion.
 
 <table>
 <tr>
@@ -47,26 +48,30 @@ Use either alone, or compose them (which is what this demo is).
 
 ### The Gate — `@openmobilehub/attesto-gate`
 
-Wrap a tool handler so it can't complete until the buyer proves a credential. Today's MCP `checkout`
+Configure once, then resolve a credential **policy** to a serializable manifest. Today's MCP `checkout`
 tool consumes it:
 
 ```ts
-import { gated } from "@openmobilehub/attesto-gate";
+import { Attesto, age, membership, payment, required, optional } from "@openmobilehub/attesto-gate";
 
-const checkout = gated(
-  (args, { order }) => ({ structuredContent: { orderId: order.id, checkoutUrl: linkFor(order) }, content: [/* … */] }),
-  { age: true },
-  {
-    resolveOrder: (args) => buildOrder(args),          // server-side, created once (stable id)
-    isAgeUnverified: (order) => store.isAgeUnverified(order),
-    approveUrl: (order) => `${origin}/credential-gate/age?order=${token(order)}`,
-    minAge: (order) => requiredAge(order),
-  },
-);
+const attesto = new Attesto({ walletOrigin: "https://shop.example" });
+attesto.mount(app);   // the wallet-ceremony seam + the per-order verification store
+
+// In your checkout tool handler — resolve the policy against the server-priced order:
+const requires = attesto.requirements(order, [
+  required(age.over(21).when(hasAlcohol)),   // 21+ — only when the cart has alcohol
+  optional(membership.discount(10)),          // 10% off if a loyalty credential is presented
+  required(payment.in("usd")),                // amount derived from the order; settles last
+]);
+return { structuredContent: { orderId: order.id, checkoutUrl, requires }, content: [/* … */] };
 ```
 
-Age-restricted + unproven → a `verification_required` envelope; otherwise your handler runs. See
-[`packages/attesto-gate/README.md`](packages/attesto-gate/README.md).
+`requirements()` is the **code→data boundary**: it runs your `.when()` predicates server-side and emits a
+flat, JSON-safe manifest (no functions cross the wire). The checkout tool **mints the link and surfaces
+`requires`** (consolidated Mode A); the page runs the gates and the completion path enforces. A page-less
+tool can instead block and return the `verification_required` envelope (Mode B — `gated()`). See
+[`packages/attesto-gate/README.md`](packages/attesto-gate/README.md) and the runnable
+[quickstart](specs/001-attesto-sdk/quickstart.md).
 
 ### The Storefront — `@openmobilehub/attesto-storefront`
 
@@ -101,7 +106,7 @@ the Claude Code terminal. The reusable SDK is being **extracted** from it. We're
 
 | | Real, runs today | Status |
 | :-- | :-- | :-- |
-| **The age gate, at the MCP tool layer** | An age-restricted cart returns a `verification_required` envelope from the `checkout` tool — no completable link without proof | ✅ `@openmobilehub/attesto-gate` v0.1 |
+| **The age gate, surfaced + enforced** | An age-restricted cart returns a checkout link **plus** a `requires` manifest (age 21+); the gate is enforced on the completion path (`place-order` → 403, with bypass tests) | ✅ `@openmobilehub/attesto-gate` v0.1 |
 | **Fail-closed mdoc verifier** | OpenID4VP + ISO 18013-5 mDL; requires an explicit `age_over_21 === true` (not token-presence); refuses 18+ for a 21+ gate; nonce-bound | ✅ |
 | **x402 → Hedera settlement** | `npm run lab:settle` settles one real order and prints a HashScan tx | ✅ |
 | **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attesto-storefront` v0.1 (slice) |
@@ -136,9 +141,9 @@ drives the whole flow from chat. The agent builds and edits the cart conversatio
 place orders or take payment** — checkout is a hand-off to an external (mock) merchant page.
 
 **The flow:** select on the cards → the agent confirms the cart and total → edit by talking ("drop the
-webcam") → **Checkout**, where the agent calls the `checkout` tool. For an age-restricted cart the tool
-returns the `verification_required` envelope; otherwise it returns a link to the mock merchant page,
-where **Authorize payment** runs a real ceremony (passkey user-presence, or a cross-device Digital
+webcam") → **Checkout**, where the agent calls the `checkout` tool. The tool returns a link to the mock
+merchant page **plus** a `requires` manifest of what the page will ask for (age 21+ for a restricted
+cart). On the page, **Authorize payment** runs a real ceremony (passkey user-presence, or a cross-device Digital
 Payment Credentials / AP2 flow where the phone's wallet signs the exact total via OpenID4VP over FIDO
 caBLE). Nothing is charged. See [`payment-gate/README.md`](payment-gate/README.md).
 
@@ -196,11 +201,12 @@ for the wallet-free buttons, and the `HEDERA_*` vars for settlement.
 
 ## Project layout
 
-- `packages/attesto-gate/` — **the Gate**: `gated()`, the `verification_required` envelope, the
-  credential model. The app consumes it.
+- `packages/attesto-gate/` — **the Gate**: the `Attesto` client + `requirements()` (the code→data
+  boundary), the credential builders (`age` / `membership` / `payment` + `defineCredential`), and the
+  `verification_required` envelope (Mode-B / page-less). The app consumes it.
 - `packages/attesto-storefront/` — **the Storefront** (slice): catalog-injected `priceCart` / `createOrder`.
 - `server.ts` — MCP server + the 9 shopping tools (`browse-products`, `add-to-cart`, …, `checkout`,
-  `get-order-status`). `checkout` is gated.
+  `get-order-status`). `checkout` surfaces a `requires` manifest beside the link.
 - `checkout.ts` — stateless orders + the mock checkout page; `createOrderForCheckout` / `checkoutUrlForOrder`.
 - `app.ts` / `main.ts` / `api/index.ts` — Express app (`/mcp` + `/checkout` + discovery), entrypoints, Vercel.
 - `attesto-discovery.ts` — `/.well-known/attesto.json` + `/llms.txt`.
@@ -210,6 +216,9 @@ for the wallet-free buttons, and the `HEDERA_*` vars for settlement.
 
 ## Deeper docs
 
+- **The v0.1 SDK spec** — [`specs/001-attesto-sdk/`](specs/001-attesto-sdk/): start with the
+  [quickstart](specs/001-attesto-sdk/quickstart.md), then [`spec.md`](specs/001-attesto-sdk/spec.md) (the
+  three execution contexts + consolidated flow) and the [API contract](specs/001-attesto-sdk/contracts/attesto-gate.api.md).
 - **Design & DX** (on the `docs/attesto-design` branch): `GETTING_STARTED.md`, `OVERVIEW.md`,
   `DECISIONS.md`, and the compiler-checked API spec in `docs/attesto-sdk/`.
 - **Payments:** [`payment-gate/README.md`](payment-gate/README.md) and
