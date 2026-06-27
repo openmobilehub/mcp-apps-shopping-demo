@@ -113,6 +113,68 @@ describe("checkout completion round-trip — the HTTP form post the widget poll 
   });
 });
 
+describe("age gate — place-order fails closed server-side (invariants #1, #4, #5)", () => {
+  // Helpers: mint an order via the checkout tool, then drive the HTTP completion path.
+  const checkout = async (c: Client, productId: string): Promise<string> =>
+    ((await c.callTool({ name: "checkout", arguments: { items: [{ productId, quantity: 1 }] } })).structuredContent as any).orderId as string;
+
+  it("refuses an unverified age-restricted order, then completes after verify-age; a clean order needs none", async () => {
+    const store = createStorefront(); // app + mcpServer share the same closure stores
+    const c = await connect(store);
+
+    // oak-whiskey is 21+ — re-derived from the catalog, not the order token.
+    const restricted = await checkout(c, "oak-whiskey");
+
+    // Unverified completion is refused (403) and NOTHING is recorded.
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: restricted }).expect(403);
+    const pending = await request(store.app).get(`/checkout/order-status?orderId=${restricted}`);
+    expect(pending.body.completed).toBe(false); // would be true if the 403 gate were removed
+
+    // Verify THIS order's age, then completion is allowed and status flips.
+    await request(store.app).post("/checkout/verify-age").type("form").send({ order: restricted }).expect(303);
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: restricted }).expect(200);
+    const done = await request(store.app).get(`/checkout/order-status?orderId=${restricted}`);
+    expect(done.body.completed).toBe(true);
+
+    // A non-age-restricted order completes with no verification at all.
+    const clean = await checkout(c, "drift-mouse");
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: clean }).expect(200);
+    const cleanStatus = await request(store.app).get(`/checkout/order-status?orderId=${clean}`);
+    expect(cleanStatus.body.completed).toBe(true);
+  });
+
+  it("verifying one order does not unlock another (per-order state, no global bleed)", async () => {
+    const store = createStorefront();
+    const c = await connect(store);
+    const a = await checkout(c, "oak-whiskey");
+    const b = await checkout(c, "celebration-champagne");
+
+    // Verify only A.
+    await request(store.app).post("/checkout/verify-age").type("form").send({ order: a }).expect(303);
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: a }).expect(200);
+
+    // B is still gated — verification did not bleed across order ids.
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: b }).expect(403);
+    const bStatus = await request(store.app).get(`/checkout/order-status?orderId=${b}`);
+    expect(bStatus.body.completed).toBe(false);
+  });
+
+  it("the checkout page gates the button: verify-age form before verification, complete after", async () => {
+    const store = createStorefront();
+    const c = await connect(store);
+    const id = await checkout(c, "oak-whiskey");
+
+    const before = await request(store.app).get(`/checkout?order=${id}`);
+    expect(before.text).toContain('action="/checkout/verify-age"');
+    expect(before.text).not.toContain('action="/checkout/place-order"');
+
+    await request(store.app).post("/checkout/verify-age").type("form").send({ order: id }).expect(303);
+
+    const after = await request(store.app).get(`/checkout?order=${id}`);
+    expect(after.text).toContain('action="/checkout/place-order"');
+  });
+});
+
 describe("CT6 — cart state is per storefront instance (no bleed)", () => {
   it("two storefronts keep independent carts", async () => {
     const a = await connect(createStorefront());

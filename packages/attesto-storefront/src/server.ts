@@ -31,6 +31,7 @@ import {
   getProduct,
   getReviews,
   priceCart,
+  requiredAgeForLines,
   SAMPLE_CATALOG,
 } from "./index.js";
 import type { CartItemInput, Order, PricedCart, Product, Review } from "./index.js";
@@ -59,6 +60,12 @@ export interface StorefrontOptions {
    * instance that never saw the order.
    */
   createdOrderStore?: OrderStore<Order>;
+  /**
+   * Per-order age-verification flags — `true` once that order id cleared the age
+   * ceremony. Keyed by order id, NEVER a process-global boolean (invariant #4):
+   * verifying one order must not unlock another (or every buyer). Default in-memory.
+   */
+  ageVerificationStore?: OrderStore<boolean>;
 }
 
 /** A completed-order record the widget poll + `get-order-status` read (the demo's ceremony writes a richer one). */
@@ -132,6 +139,13 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
   // Created-but-not-completed orders, for the checkout page + place-order. A store
   // (not a process Map) so it can be shared across serverless instances.
   const createdOrderStore: OrderStore<Order> = opts.createdOrderStore ?? new MemoryOrderStore<Order>();
+  // Per-order age-verification flags (invariant #4: keyed by order id, never global).
+  const ageVerificationStore: OrderStore<boolean> = opts.ageVerificationStore ?? new MemoryOrderStore<boolean>();
+  // Re-derive the order's strictest age threshold from the catalog — never from the
+  // stored/forged order (invariant #2). null ⇒ nothing age-restricted in the order.
+  const requiredAge = (order: Order): number | null => requiredAgeForLines(order.lines, catalog);
+  // Explicit positive per-order claim (invariant #5): only `true` counts as verified.
+  const isAgeVerified = async (orderId: string): Promise<boolean> => (await ageVerificationStore.read(orderId)) === true;
   let resolveGate: GateResolver | undefined;
   let baseUrl = opts.baseUrl?.replace(/\/+$/, "") ?? "";
 
@@ -340,21 +354,52 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
     const reqList = requires.length
       ? `<ul>${requires.map((r) => `<li>${r.approveUrl ? `<a href="${r.approveUrl}">${r.label ?? r.credential}</a>` : (r.label ?? r.credential)}</li>`).join("")}</ul>`
       : "<p>No verification required.</p>";
+    // Age gate (re-derived from the catalog): until THIS order is verified, surface
+    // the verify-age form in place of Complete — the button is enforced server-side
+    // in place-order regardless, so this only mirrors what would be refused.
+    const minAge = requiredAge(order);
+    const action = minAge != null && !(await isAgeVerified(order.id))
+      ? `<form method="post" action="/checkout/verify-age"><input type="hidden" name="order" value="${order.id}">` +
+        `<button style="padding:.6rem 1rem">Verify age (demo)</button></form>` +
+        `<p style="color:#b45309;font-size:.85rem">Age-restricted order (${minAge}+). Verify before you can complete.</p>`
+      : `<form method="post" action="/checkout/place-order"><input type="hidden" name="order" value="${order.id}">` +
+        `<button style="padding:.6rem 1rem">Complete purchase (demo)</button></form>`;
     res.type("html").send(
       `<!doctype html><meta charset="utf-8"><title>Checkout ${order.id}</title>` +
       `<body style="font-family:system-ui;max-width:32rem;margin:3rem auto">` +
       `<h1>Checkout — ${order.id}</h1>` +
       `<p>${order.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")} — <b>${order.total} ${order.currency}</b></p>` +
       `<h3>Required to complete</h3>${reqList}` +
-      `<form method="post" action="/checkout/place-order"><input type="hidden" name="order" value="${order.id}">` +
-      `<button style="padding:.6rem 1rem">Complete purchase (demo)</button></form>` +
+      action +
       `<p style="color:#888;font-size:.85rem">Demo completion — real fail-closed verification is provided by ` +
       `<code>attesto.mount()</code> + the reference demo's caBLE ceremony.</p></body>`,
     );
   });
+  // Demo stand-in for the real age ceremony: mark THIS order id verified, then
+  // bounce back to its checkout page. Per-order (invariant #4) — verifying one
+  // order never unlocks another.
+  app.post("/checkout/verify-age", async (req: Request, res: Response) => {
+    const orderId = String(req.body?.order ?? "");
+    const order = orderId ? await createdOrderStore.read(orderId) : null;
+    if (!order) return res.status(404).type("html").send("<h1>Unknown order</h1>");
+    await ageVerificationStore.write(order.id, true);
+    res.redirect(303, `/checkout?order=${encodeURIComponent(order.id)}`);
+  });
   app.post("/checkout/place-order", async (req: Request, res: Response) => {
     const order = await createdOrderStore.read(String(req.body?.order ?? ""));
     if (order) {
+      // Fail-closed age gate (invariant #1): re-derive the restriction from the
+      // catalog (never trust the stored order — invariant #2) and require an
+      // explicit positive per-order claim (invariant #5) before completing. No
+      // completion is written and the cart is left intact on refusal.
+      if (requiredAge(order) != null && !(await isAgeVerified(order.id))) {
+        return res.status(403).type("html").send(
+          `<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;max-width:32rem;margin:3rem auto">` +
+          `<h1>Age verification required</h1>` +
+          `<p>This order contains age-restricted items. Verify your age before completing.</p>` +
+          `<p><a href="/checkout?order=${encodeURIComponent(order.id)}">Back to checkout</a></p></body>`,
+        );
+      }
       await orderStore.write(order.id, { orderId: order.id, amount: order.total, currency: order.currency, method: "demo", completedAt: new Date().toISOString() });
       await cartStore.write(new Map()); // completion empties the cart
     }
