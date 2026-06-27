@@ -101,5 +101,5 @@ PRs get both automated and human review:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/002-attesto-storefront/plan.md
+at specs/003-gate-ceremony-extraction/plan.md
 <!-- SPECKIT END -->
