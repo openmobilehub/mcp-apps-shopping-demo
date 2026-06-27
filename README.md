@@ -56,7 +56,7 @@ import { Attesto, age, membership, payment, required, optional } from "@openmobi
 
 const attesto = new Attesto();   // zero-config (defaults to http://localhost:3000)
 // for a deployment, pass your public origin: new Attesto({ walletOrigin: "https://shop.example" })
-attesto.mount(app);   // the wallet-ceremony seam + the per-order verification store
+attesto.mount(app);   // wires the real /attesto/* ceremony rails (passkey + dc-payment + credential gate)
 
 // In your checkout tool handler — resolve the policy against the server-priced order:
 const requires = attesto.requirements(order, [
