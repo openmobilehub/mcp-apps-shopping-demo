@@ -1,14 +1,38 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import request from "supertest";
+import type { Server } from "node:http";
 import { createApp } from "./app.js";
 import { orderStore } from "./orderStore.js";
 import { cartStore } from "./cartStore.js";
 import { createCheckoutOrder } from "./checkout.js";
 import { RESOURCE_URI, SKYBRIDGE_URI } from "./server.js";
 
+// Bind each app to ONE already-listening server for the test and close it after,
+// rather than letting supertest spin up (and immediately tear down) a fresh ephemeral
+// server for every `request()` call. Across this file's ~20 apps × multiple requests
+// each, that per-request listen/close churn intermittently stalled a request to the
+// timeout or dropped its response — the long-standing app.test.ts flake. Awaiting the
+// `listening` state before any request keeps `server.address()` non-null, so supertest
+// doesn't `listen(0)` a second time on the same server and race its own bind. The
+// tracking array is file-local (not a shared module) so one file's teardown can't
+// touch another's. No assertion changes — supertest accepts a live http.Server and
+// drives it over http (its https check is `instanceof tls.Server`).
+const openServers: Server[] = [];
+function startApp(opts: Parameters<typeof createApp>[0]): Promise<Server> {
+  return new Promise((resolve) => {
+    const server = createApp(opts).listen(0, () => {
+      openServers.push(server);
+      resolve(server);
+    });
+  });
+}
+afterEach(() => {
+  for (const server of openServers.splice(0)) server.close();
+});
+
 describe("createApp", () => {
   it("serves the checkout page on /checkout with a valid order token", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     // An obviously-invalid token yields the 404 page, proving the route is mounted.
     const res = await request(app).get("/checkout?order=not-a-real-token");
     expect(res.status).toBe(404);
@@ -16,7 +40,7 @@ describe("createApp", () => {
   });
 
   it("GET /checkout/order-status reports incomplete when no matching order", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     await orderStore.clear();
     const res = await request(app).get("/checkout/order-status?orderId=ORD-NONE");
     expect(res.status).toBe(200);
@@ -25,7 +49,7 @@ describe("createApp", () => {
   });
 
   it("GET /checkout/order-status returns the order once it matches the orderId", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     await orderStore.write({
       orderId: "ORD-APP01",
       mandateId: "mandate_pm_test",
@@ -46,7 +70,7 @@ describe("createApp", () => {
   });
 
   it("POST /checkout/place-order completes the order (instant demo) and clears the cart", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     await orderStore.clear();
     await cartStore.write(new Map([["aurora-headphones", 1]]));
 
@@ -74,20 +98,20 @@ describe("createApp", () => {
   });
 
   it("POST /checkout/place-order rejects a missing or invalid order token", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).post("/checkout/place-order").send({ order: "garbage" });
     expect(res.status).toBe(400);
     expect(res.body.ok).toBe(false);
   });
 
   it("responds to POST /mcp", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).post("/mcp").send({ jsonrpc: "2.0", id: 1, method: "ping" });
     expect(res.status).toBeLessThan(500);
   });
 
   it("UI resource allowlists the checkout origin in CSP connectDomains so the widget poll isn't blocked", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app)
       .post("/mcp")
       .set("Accept", "application/json, text/event-stream")
@@ -104,7 +128,7 @@ describe("createApp", () => {
   });
 
   it("skybridge resource allowlists the checkout origin in widgetCSP connect_domains so the ChatGPT widget poll isn't blocked", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app)
       .post("/mcp")
       .set("Accept", "application/json, text/event-stream")
@@ -140,7 +164,7 @@ const demoMode = () => {
 
 describe("instant-demo fencing (DEMO_MODE off by default)", () => {
   it("refuses the demo verify (403) and leaves the order gated", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-NODEMO");
     const res = await request(app).post("/credential-gate/age/demo").send({ order: token });
     expect(res.status).toBe(403);
@@ -149,7 +173,7 @@ describe("instant-demo fencing (DEMO_MODE off by default)", () => {
   });
 
   it("hides the instant-demo button on the gate page", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).get("/credential-gate/age");
     expect(res.text).not.toContain('id="demo"');
   });
@@ -157,7 +181,7 @@ describe("instant-demo fencing (DEMO_MODE off by default)", () => {
   it("renders the instant-demo button when DEMO_MODE=1", async () => {
     vi.stubEnv("DEMO_MODE", "1");
     try {
-      const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+      const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
       const res = await request(app).get("/credential-gate/age");
       expect(res.text).toContain('id="demo"');
     } finally {
@@ -170,26 +194,26 @@ describe("credential gate wiring", () => {
   demoMode();
 
   it("serves the age gate page", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).get("/credential-gate/age");
     expect(res.status).toBe(200);
     expect(res.text).toContain("Verify your age");
   });
 
   it("404s an unknown gate kind", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).get("/credential-gate/bogus");
     expect(res.status).toBe(404);
   });
 
   it("rejects a demo verify with no order", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const res = await request(app).post("/credential-gate/age/demo").send({});
     expect(res.status).toBe(400);
   });
 
   it("instant-demo age verify unlocks payment for THAT order only (no cross-order bleed)", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const tokenA = orderToken("ORD-A");
     const tokenB = orderToken("ORD-B");
     expect((await request(app).get(co(tokenA))).text).toContain("Payment is locked");
@@ -206,7 +230,7 @@ describe("credential gate wiring", () => {
   });
 
   it("instant-demo loyalty applies the discount for that order", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-LOY", "aurora-headphones"); // non-alcohol: no age gate
     await request(app).post("/credential-gate/loyalty/demo").send({ order: token });
     expect((await request(app).get(co(token))).text).toContain("Loyalty discount");
@@ -217,7 +241,7 @@ describe("server-side age gate (place-order)", () => {
   demoMode();
 
   it("rejects place-order for an age-restricted order with no age verification (403)", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-BYPASS"); // champagne, never age-verified
     const res = await request(app).post("/checkout/place-order").send({ order: token });
     expect(res.status).toBe(403);
@@ -227,7 +251,7 @@ describe("server-side age gate (place-order)", () => {
   });
 
   it("allows place-order once the order is age-verified", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-OK");
     await request(app).post("/credential-gate/age/demo").send({ order: token });
     const res = await request(app).post("/checkout/place-order").send({ order: token });
@@ -235,7 +259,7 @@ describe("server-side age gate (place-order)", () => {
   });
 
   it("allows place-order for a non-age-restricted order without verification", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-PLAIN", "aurora-headphones");
     const res = await request(app).post("/checkout/place-order").send({ order: token });
     expect(res.body.ok).toBe(true);
@@ -246,7 +270,7 @@ describe("checkout resets verification", () => {
   demoMode();
 
   it("place-order clears that order's verification", async () => {
-    const app = createApp({ publicBaseUrl: "http://localhost:3001" });
+    const app = await startApp({ publicBaseUrl: "http://localhost:3001" });
     const token = orderToken("ORD-RESET1");
     await request(app).post("/credential-gate/age/demo").send({ order: token });
     expect((await request(app).get(co(token))).text).toContain("Age verified");
