@@ -19,11 +19,11 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: false,
   },
-  // The repo carries local git worktrees under .worktrees/ (gitignored). Vitest
-  // still scans the filesystem, so without this it runs duplicate copies of every
-  // test — inflating counts and surfacing cross-copy flakiness. Scope tests to the
-  // main tree.
+  // The repo carries local git worktrees under .worktrees/ AND harness/agent
+  // worktrees under .claude/worktrees/ (both gitignored). Vitest still scans the
+  // filesystem, so without this it runs duplicate copies of every test — inflating
+  // counts and surfacing cross-copy flakiness. Scope tests to the main tree.
   test: {
-    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
+    exclude: [...configDefaults.exclude, "**/.worktrees/**", "**/.claude/worktrees/**"],
   },
 });
