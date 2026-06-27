@@ -25,6 +25,33 @@ order.total;                                  // 124
 `minimumAge` on a product is the one field that ties the two packages together: set
 it, and a Gate on `checkout` locks payment until age is proven.
 
+## Bring your own catalog
+
+`createStorefront()` (from the `/server` entry) stands up the whole MCP storefront — the
+shopping tools + widget + checkout page over HTTP — around a catalog you inject. The catalog
+isn't *configured*, it's *passed in*: own-the-code, edit the array, and the tools, widget, and
+gate all follow.
+
+```ts
+import { createStorefront } from "@openmobilehub/attesto-storefront/server";
+
+const store = createStorefront({
+  catalog: [
+    { id: "single-origin-coffee", name: "Yirgacheffe Beans", price: 22, currency: "USD",
+      image: "https://picsum.photos/seed/coffee/600", category: "Coffee", description: "Light roast." },
+    { id: "natural-wine", name: "Pét-Nat Natural Wine", price: 38, currency: "USD",
+      image: "https://picsum.photos/seed/wine/600", category: "Beverages", description: "21+ only.",
+      minimumAge: 21 },                       // ← this one field arms the age gate for the line
+  ],
+  reviews: { "natural-wine": [{ author: "Sasha", rating: 5, text: "Funky in the best way." }] },
+});
+
+const { url } = await store.listen(3006);     // → http://localhost:3006/mcp
+```
+
+Runnable end-to-end (with an Attesto gate wired on `checkout`) in
+[`examples/byo-catalog.mjs`](../../examples/byo-catalog.mjs).
+
 ## What's real in v0.1
 
 - `priceCart()` / `createOrder()` / `requiredAgeForLines()` — pure, catalog-injected.
