@@ -619,11 +619,20 @@ function Picker({ products, cart, insets, setQuantity, checkout, openLink, confi
       )}
 
       <div className={styles.footer}>
-        <span className={styles.summary}>
-          {cart.itemCount > 0
-            ? `🛒 ${cart.itemCount} in cart · ${formatMoney(cart.total, cart.currency)}`
-            : "🛒 Cart is empty"}
-        </span>
+        <div className={styles.summaryGroup}>
+          <span className={styles.summary}>
+            {cart.itemCount > 0
+              ? `🛒 ${cart.itemCount} in cart · ${formatMoney(cart.total, cart.currency)}`
+              : "🛒 Cart is empty"}
+          </span>
+          {/* Loyalty discount applied server-side: surface it near the total so
+              the −amount the buyer is getting is visible (invariant #3). */}
+          {cart.discount > 0 && (
+            <span className={styles.discountRow}>
+              Loyalty −{formatMoney(cart.discount, cart.currency)}
+            </span>
+          )}
+        </div>
         {checkout && cart.itemCount > 0 && !pendingCheckoutUrl && (
           <button
             className={styles.checkout}

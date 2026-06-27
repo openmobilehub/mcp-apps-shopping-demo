@@ -33,7 +33,7 @@ import {
   priceCart,
   SAMPLE_CATALOG,
 } from "./index.js";
-import type { CartItemInput, Order, PricedCart, Product, Review } from "./index.js";
+import type { CartItemInput, Order, PriceOpts, PricedCart, Product, Review } from "./index.js";
 import { appToolMeta } from "./tool-meta.js";
 import { MemoryCartStore, MemoryOrderStore } from "./state.js";
 import type { CartStore, OrderStore } from "./state.js";
@@ -59,6 +59,13 @@ export interface StorefrontOptions {
    * instance that never saw the order.
    */
   createdOrderStore?: OrderStore<Order>;
+  /**
+   * Per-order loyalty-applied flags — the discount's source of truth, keyed by
+   * order id. Default in-memory. Scoped per order (never process-global) so one
+   * buyer's loyalty can't discount another's order (invariant #4); every
+   * completion path reprices off this flag rather than a client-sent amount.
+   */
+  loyaltyStore?: OrderStore<boolean>;
 }
 
 /** A completed-order record the widget poll + `get-order-status` read (the demo's ceremony writes a richer one). */
@@ -132,6 +139,8 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
   // Created-but-not-completed orders, for the checkout page + place-order. A store
   // (not a process Map) so it can be shared across serverless instances.
   const createdOrderStore: OrderStore<Order> = opts.createdOrderStore ?? new MemoryOrderStore<Order>();
+  // Per-order loyalty flags (the discount's source of truth), keyed by order id.
+  const loyaltyStore: OrderStore<boolean> = opts.loyaltyStore ?? new MemoryOrderStore<boolean>();
   let resolveGate: GateResolver | undefined;
   let baseUrl = opts.baseUrl?.replace(/\/+$/, "") ?? "";
 
@@ -149,9 +158,17 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
   app.use(express.urlencoded({ extended: false }));
 
   // ── cart logic (closure over the injected catalog + the cart store) ───────
-  const priceFrom = (cart: Map<string, number>): PricedCart =>
-    priceCart([...cart.entries()].map(([productId, quantity]) => ({ productId, quantity })), catalog);
+  const priceFrom = (cart: Map<string, number>, priceOpts: PriceOpts = {}): PricedCart =>
+    priceCart([...cart.entries()].map(([productId, quantity]) => ({ productId, quantity })), catalog, priceOpts);
   const readPriced = async (): Promise<PricedCart> => priceFrom(await cartStore.read());
+  // Re-derive an order's pricing from the catalog + its stored per-order loyalty
+  // flag — never trust the total carried on the stored order object (invariant #2).
+  // Every completion path (the checkout page, place-order) reprices through this so
+  // the line sum, the order total, and the recorded amount always agree (invariant #3).
+  const repriceOrder = async (order: Order): Promise<PricedCart> => {
+    const loyaltyApplied = (await loyaltyStore.read(order.id)) === true;
+    return priceFrom(new Map(order.lines.map((l) => [l.id, l.quantity])), { loyaltyApplied });
+  };
   const addToCart = async (items: CartItemInput[]): Promise<PricedCart> => {
     const cart = await cartStore.read();
     for (const { productId, quantity } of items) {
@@ -243,17 +260,23 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
     registerAppTool(
       server,
       "checkout",
-      { title: "Checkout", description: "Snapshot the cart into an order and return a checkout link; if gated, also a `requires` manifest of what the buyer must prove on the page.", inputSchema: { items: z.array(z.object({ productId: z.string(), quantity: z.number().int().positive() })).optional() }, annotations: { readOnlyHint: false }, _meta: UI_META },
-      async ({ items }): Promise<CallToolResult> => {
+      { title: "Checkout", description: "Snapshot the cart into an order and return a checkout link; if gated, also a `requires` manifest of what the buyer must prove on the page. Pass `loyalty: true` to apply the member loyalty discount to this order.", inputSchema: { items: z.array(z.object({ productId: z.string(), quantity: z.number().int().positive() })).optional(), loyalty: z.boolean().optional() }, annotations: { readOnlyHint: false }, _meta: UI_META },
+      async ({ items, loyalty }): Promise<CallToolResult> => {
         const entries = items?.length ? items : [...(await cartStore.read()).entries()].map(([productId, quantity]) => ({ productId, quantity }));
         if (entries.length === 0) return { content: [{ type: "text", text: "The cart is empty — add items before checking out." }], isError: true };
+        // Loyalty is opt-in per order; the discount is re-derived server-side from
+        // the catalog (never a client-sent amount) and recorded as this order's flag.
+        const priceOpts: PriceOpts = { loyaltyApplied: loyalty === true };
         // Random id (not a per-instance counter): two serverless instances must
         // not both mint "ORD-1" for different carts.
-        const order = createOrder(entries, `ORD-${Math.random().toString(36).slice(2, 8)}`, catalog);
+        const order = createOrder(entries, `ORD-${Math.random().toString(36).slice(2, 8)}`, catalog, priceOpts);
         await createdOrderStore.write(order.id, order);
+        // Record the per-order loyalty flag (the discount's source of truth) before
+        // any completion path reprices off it (invariants #2/#3/#4).
+        await loyaltyStore.write(order.id, priceOpts.loyaltyApplied === true);
         const checkoutUrl = `${baseUrl}/checkout?order=${order.id}`;
         const requires = resolveGate?.(order); // ← where Attesto mounts on
-        const priced = priceFrom(new Map(entries.map((e) => [e.productId, e.quantity])));
+        const priced = priceFrom(new Map(entries.map((e) => [e.productId, e.quantity])), priceOpts);
         // Cart-bearing structuredContent (FR-014): a fresh ChatGPT widget instance
         // hydrates the real cart instead of an empty one.
         const payload = { orderId: order.id, checkoutUrl, ...(requires?.length ? { requires } : {}), products: catalog, cart: priced };
@@ -336,15 +359,22 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
   app.get("/checkout", async (req: Request, res: Response) => {
     const order = await createdOrderStore.read(String(req.query.order ?? ""));
     if (!order) return res.status(404).type("html").send("<h1>Unknown order</h1>");
+    // Re-derive the total + discount from the catalog + this order's loyalty flag,
+    // so the page never displays a hand-edited amount (invariants #2/#3).
+    const priced = await repriceOrder(order);
     const requires = (resolveGate?.(order) ?? []) as Array<{ label?: string; credential?: string; approveUrl?: string }>;
     const reqList = requires.length
       ? `<ul>${requires.map((r) => `<li>${r.approveUrl ? `<a href="${r.approveUrl}">${r.label ?? r.credential}</a>` : (r.label ?? r.credential)}</li>`).join("")}</ul>`
       : "<p>No verification required.</p>";
+    const loyaltyLine = priced.discount > 0
+      ? `<p style="color:#0a7f2e">Loyalty discount −${priced.discount} ${priced.currency}</p>`
+      : "";
     res.type("html").send(
       `<!doctype html><meta charset="utf-8"><title>Checkout ${order.id}</title>` +
       `<body style="font-family:system-ui;max-width:32rem;margin:3rem auto">` +
       `<h1>Checkout — ${order.id}</h1>` +
-      `<p>${order.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")} — <b>${order.total} ${order.currency}</b></p>` +
+      `<p>${order.lines.map((l) => `${l.quantity}× ${l.name}`).join(", ")} — <b>${priced.total} ${priced.currency}</b></p>` +
+      loyaltyLine +
       `<h3>Required to complete</h3>${reqList}` +
       `<form method="post" action="/checkout/place-order"><input type="hidden" name="order" value="${order.id}">` +
       `<button style="padding:.6rem 1rem">Complete purchase (demo)</button></form>` +
@@ -355,7 +385,11 @@ export function createStorefront(opts: StorefrontOptions = {}): Storefront {
   app.post("/checkout/place-order", async (req: Request, res: Response) => {
     const order = await createdOrderStore.read(String(req.body?.order ?? ""));
     if (order) {
-      await orderStore.write(order.id, { orderId: order.id, amount: order.total, currency: order.currency, method: "demo", completedAt: new Date().toISOString() });
+      // Re-derive the amount from the catalog + the stored loyalty flag — the
+      // recorded payment amount must equal the discounted total the buyer saw,
+      // not a total carried on a hand-editable order object (invariants #2/#3).
+      const priced = await repriceOrder(order);
+      await orderStore.write(order.id, { orderId: order.id, amount: priced.total, currency: priced.currency, method: "demo", completedAt: new Date().toISOString() });
       await cartStore.write(new Map()); // completion empties the cart
     }
     res.type("html").send(`<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;max-width:32rem;margin:3rem auto"><h1>✓ Order placed (demo)</h1><p>You can close this tab — the storefront will update.</p></body>`);

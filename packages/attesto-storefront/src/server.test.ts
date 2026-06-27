@@ -8,6 +8,8 @@ import request from "supertest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createStorefront, originFromRequest, type Storefront } from "./server.js";
+import { MemoryOrderStore } from "./state.js";
+import { LOYALTY_DISCOUNT_PCT, type Order } from "./index.js";
 import type { Request } from "express";
 
 const mockReq = (headers: Record<string, string>, protocol = "http"): Request =>
@@ -120,5 +122,70 @@ describe("CT6 — cart state is per storefront instance (no bleed)", () => {
     await a.callTool({ name: "add-to-cart", arguments: { items: [{ productId: "oak-whiskey", quantity: 2 }] } });
     const bCart = (await b.callTool({ name: "get-cart", arguments: {} })).structuredContent as any;
     expect(bCart.cart.itemCount).toBe(0); // a's add did not leak into b
+  });
+});
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+describe("loyalty discount — applied server-side, reconciled across every path", () => {
+  it("checkout(loyalty:true) ⇒ the cart total is subtotal − discount and the line sum still reconciles", async () => {
+    const c = await connect(createStorefront());
+    const sc = (await c.callTool({ name: "checkout", arguments: { items: [{ productId: "oak-whiskey", quantity: 1 }], loyalty: true } })).structuredContent as any;
+    const cart = sc.cart;
+    const expectedDiscount = round2(124 * (LOYALTY_DISCOUNT_PCT / 100));
+    expect(cart.discount).toBe(expectedDiscount);
+    expect(cart.total).toBe(round2(cart.subtotal - cart.discount)); // total = subtotal − discount
+    // No path may accept a total that disagrees with its lines (invariant #3).
+    expect(cart.lines.reduce((s: number, l: any) => s + l.lineTotal, 0)).toBe(cart.subtotal);
+  });
+
+  it("without loyalty the same cart is full price (the flag is opt-in, not on by default)", async () => {
+    const c = await connect(createStorefront());
+    const sc = (await c.callTool({ name: "checkout", arguments: { items: [{ productId: "oak-whiskey", quantity: 1 }] } })).structuredContent as any;
+    expect(sc.cart.discount).toBe(0);
+    expect(sc.cart.total).toBe(124);
+  });
+
+  it("the recorded amount is re-derived from the catalog, NOT the (hand-editable) stored order total", async () => {
+    // Inject the created-order store so we can tamper with the stored amount the
+    // way a hand-edited order token would (invariant #2). The completion path must
+    // ignore it and reprice from the catalog + the per-order loyalty flag.
+    const createdOrderStore = new MemoryOrderStore<Order>();
+    const store = createStorefront({ createdOrderStore });
+    const c = await connect(store);
+    const sc = (await c.callTool({ name: "checkout", arguments: { items: [{ productId: "oak-whiskey", quantity: 1 }], loyalty: true } })).structuredContent as any;
+    const orderId = sc.orderId as string;
+    const expectedTotal = round2(124 - 124 * (LOYALTY_DISCOUNT_PCT / 100)); // 111.6
+
+    // The checkout page shows the discounted total, not full price.
+    const page = await request(store.app).get(`/checkout?order=${orderId}`);
+    expect(page.text).toContain(String(expectedTotal));
+    expect(page.text).toContain("Loyalty discount");
+
+    // Tamper: rewrite the stored order's monetary total to a bogus value.
+    const stored = (await createdOrderStore.read(orderId))!;
+    await createdOrderStore.write(orderId, { ...stored, subtotal: 1, discount: 0, total: 1 });
+
+    // Complete. The recorded amount must be the re-derived discounted total (111.6),
+    // never the tampered 1 — this assertion fails if the re-derivation is removed.
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: orderId }).expect(200);
+    const status = await request(store.app).get(`/checkout/order-status?orderId=${orderId}`);
+    expect(status.body.completed).toBe(true);
+    expect(status.body.order.amount).toBe(expectedTotal);
+    expect(status.body.order.amount).not.toBe(1);
+  });
+
+  it("the loyalty flag is scoped per order — a discounted order does not discount the next one", async () => {
+    const store = createStorefront();
+    const c = await connect(store);
+    const discounted = (await c.callTool({ name: "checkout", arguments: { items: [{ productId: "drift-mouse", quantity: 1 }], loyalty: true } })).structuredContent as any;
+    const plain = (await c.callTool({ name: "checkout", arguments: { items: [{ productId: "drift-mouse", quantity: 1 }] } })).structuredContent as any;
+    expect(discounted.cart.discount).toBeGreaterThan(0);
+    expect(plain.cart.discount).toBe(0); // the prior order's loyalty did not bleed forward
+
+    // And each order's completion records its own amount (no cross-order bleed).
+    await request(store.app).post("/checkout/place-order").type("form").send({ order: plain.orderId }).expect(200);
+    const plainStatus = await request(store.app).get(`/checkout/order-status?orderId=${plain.orderId}`);
+    expect(plainStatus.body.order.amount).toBe(49); // full price for the un-flagged order
   });
 });

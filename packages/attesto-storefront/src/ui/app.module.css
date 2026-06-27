@@ -225,6 +225,12 @@
   background: light-dark(#fafafa, #181818);
 }
 
+.summaryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .summary {
   font-size: 13px;
 }
