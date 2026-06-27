@@ -1,63 +1,40 @@
-// _meta key carrying the catalog from browse-products to the UI. Kept out of
-// the tool's text content so the model doesn't re-render the list as a table.
-export const CATALOG_META_KEY = "product-picker/catalog";
+// The demo's storefront catalog — now CONSUMING the extracted package
+// (@openmobilehub/attesto-storefront) for the pricing/order model instead of
+// duplicating it. This file is the demo's catalog DATA (its products + reviews)
+// plus thin catalog-bound wrappers; the cart → priced-cart → order logic lives in
+// the package and is injected with the demo's own `CATALOG`, so the storefront
+// logic exists in exactly one place and can't drift between the demo and the
+// package (US2 / 002 — "the demo consumes the package").
+//
+// The `checkout` MCP tool, the checkout web page, and the caBLE payment ceremony
+// still live in the demo (server.ts / checkout.ts / app.ts / payment-gate/);
+// rewiring those onto createStorefront() + attesto.mount() is the steered finish
+// (feature 003). Reviews stay local: the demo's review shape ({title, body})
+// differs from the package's ({text}), and is data, not logic.
 
-// _meta key carrying the current priced cart to the UI (app-only, out-of-band)
-// so the model doesn't re-render it as text.
-export const CART_META_KEY = "product-picker/cart";
+import {
+  CART_META_KEY,
+  CATALOG_META_KEY,
+  LOYALTY_DISCOUNT_PCT,
+  createOrder as createOrderCore,
+  getProduct as getProductCore,
+  priceCart as priceCartCore,
+  requiredAgeForLines as requiredAgeForLinesCore,
+} from "@openmobilehub/attesto-storefront";
+import type {
+  CartItemInput,
+  Order,
+  PriceOpts,
+  PricedCart,
+  PricedCartLine,
+  Product,
+} from "@openmobilehub/attesto-storefront";
 
-// Loyalty members get this percentage off the whole cart when they present a
-// valid loyalty credential. Whole-cart, mirrors a2ui_concierge.
-export const LOYALTY_DISCOUNT_PCT = 10;
-
-export interface Product {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  image: string;
-  category: string;
-  description: string;
-  // Minimum age required to purchase (e.g. 21 for alcohol). Absent = no age
-  // restriction. Drives the age-verification threshold at checkout.
-  minimumAge?: number;
-}
-
-export interface CartItemInput {
-  productId: string;
-  quantity: number;
-}
-
-export interface PricedCartLine {
-  id: string;
-  name: string;
-  unitPrice: number;
-  currency: string;
-  quantity: number;
-  lineTotal: number;
-}
-
-export interface PricedCart {
-  lines: PricedCartLine[];
-  itemCount: number;
-  subtotal: number;
-  discount: number;
-  total: number;
-  currency: string;
-  unknownIds: string[];
-  // True when any line is age-restricted (alcohol).
-  hasAgeRestricted: boolean;
-  // Reflects verificationStore at pricing time (false in pure/unit pricing).
-  ageVerified: boolean;
-  loyaltyApplied: boolean;
-}
-
-// Verification flags that influence pricing/gating. Passed by the server from
-// verificationStore; defaults to all-false for pure pricing.
-export interface PriceOpts {
-  ageVerified?: boolean;
-  loyaltyApplied?: boolean;
-}
+// Re-export the package's pricing/order model so existing demo imports
+// (`from "./catalog.js"`) keep working unchanged while the implementation now
+// comes from one place.
+export { CART_META_KEY, CATALOG_META_KEY, LOYALTY_DISCOUNT_PCT };
+export type { CartItemInput, Order, PriceOpts, PricedCart, PricedCartLine, Product };
 
 export const CATALOG: Product[] = [
   {
@@ -164,18 +141,16 @@ export const CATALOG: Product[] = [
   },
 ];
 
+// Look up a product by id in the demo's catalog (the package function, with our
+// catalog injected).
 export function getProduct(productId: string): Product | undefined {
-  return CATALOG.find((p) => p.id === productId);
+  return getProductCore(CATALOG, productId);
 }
 
-
+// The strictest minimum age across these lines, or null if none — resolved
+// against the demo's catalog.
 export function requiredAgeForLines(lines: { id: string }[]): number | null {
-  let max: number | null = null;
-  for (const { id } of lines) {
-    const m = getProduct(id)?.minimumAge;
-    if (m != null && (max === null || m > max)) max = m;
-  }
-  return max;
+  return requiredAgeForLinesCore(lines, CATALOG);
 }
 
 export interface Review {
@@ -186,7 +161,8 @@ export interface Review {
 }
 
 // Sample reviews keyed by product id. Lets the model answer "what do people say
-// about X?" without a real backend.
+// about X?" without a real backend. Kept local: the demo's review shape
+// ({title, body}) is richer than the package's ({text}), and it's catalog data.
 export const REVIEWS: Record<string, Review[]> = {
   "aurora-headphones": [
     { author: "Mia R.", rating: 5, title: "ANC is the real deal", body: "Cancels the office hum completely. Battery easily lasts a work week." },
@@ -238,67 +214,14 @@ export function getReviews(productId: string): Review[] {
   return REVIEWS[productId] ?? [];
 }
 
+// Price a cart against the demo's catalog — delegates to the package's pure
+// pricing function with `CATALOG` injected.
 export function priceCart(items: CartItemInput[], opts: PriceOpts = {}): PricedCart {
-  const byId = new Map(CATALOG.map((p) => [p.id, p]));
-  const lines: PricedCartLine[] = [];
-  const unknownIds: string[] = [];
-  let hasAgeRestricted = false;
-  for (const { productId, quantity } of items) {
-    const product = byId.get(productId);
-    if (!product) {
-      unknownIds.push(productId);
-      continue;
-    }
-    if (quantity <= 0) continue;
-    if (product.minimumAge != null) hasAgeRestricted = true;
-    lines.push({
-      id: product.id,
-      name: product.name,
-      unitPrice: product.price,
-      currency: product.currency,
-      quantity,
-      lineTotal: product.price * quantity,
-    });
-  }
-  const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
-  const loyaltyApplied = !!opts.loyaltyApplied;
-  const discount = loyaltyApplied
-    ? Math.round(subtotal * (LOYALTY_DISCOUNT_PCT / 100) * 100) / 100
-    : 0;
-  const total = Math.round((subtotal - discount) * 100) / 100;
-  const currency = lines[0]?.currency ?? "USD";
-  return {
-    lines,
-    itemCount,
-    subtotal,
-    discount,
-    total,
-    currency,
-    unknownIds,
-    hasAgeRestricted,
-    ageVerified: !!opts.ageVerified,
-    loyaltyApplied,
-  };
+  return priceCartCore(items, CATALOG, opts);
 }
 
-// An order is a snapshot of the priced cart at checkout time. The demo does not
-// take payment in chat: checkout hands off to an external (mock) merchant page,
-// where the user completes the purchase with their own account.
-export interface Order {
-  id: string;
-  lines: PricedCartLine[];
-  itemCount: number;
-  subtotal: number;
-  discount: number;
-  total: number;
-  currency: string;
-  createdAt: string;
-}
-
-// Snapshots cart items into an order. Unknown product ids are dropped (not
-// validated).
+// Snapshot cart items into an order against the demo's catalog. Unknown product
+// ids are dropped (not validated).
 export function createOrder(items: CartItemInput[], id: string, opts: PriceOpts = {}): Order {
-  const { lines, itemCount, subtotal, discount, total, currency } = priceCart(items, opts);
-  return { id, lines, itemCount, subtotal, discount, total, currency, createdAt: new Date().toISOString() };
+  return createOrderCore(items, id, CATALOG, opts);
 }
