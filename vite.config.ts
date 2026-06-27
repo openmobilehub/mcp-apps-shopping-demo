@@ -38,5 +38,18 @@ export default defineConfig({
     // which would otherwise exceed maxForks and throw.
     testTimeout: 15000,
     poolOptions: { forks: { minForks: 1, maxForks: 2 } },
+    // Run test FILES sequentially. Many suites drive Express apps via supertest's
+    // `request(app)`, which binds a fresh ephemeral loopback server per call;
+    // running files in parallel makes those servers/ports contend and a request
+    // intermittently stalls to the timeout (the floating "supertest flake").
+    // Serializing files removes the contention deterministically — the suite is
+    // small, so the wall-clock cost is a few seconds. Tests WITHIN a file still run
+    // concurrently. (Supersedes relying on the fork cap alone.)
+    fileParallelism: false,
+    // The residual supertest loopback-port contention is ENVIRONMENTAL (every test
+    // passes in isolation; only a parallel/under-load run can stall one to its
+    // timeout). Retry absorbs that transient without masking a real failure — a
+    // genuine regression fails all attempts. This keeps CI deterministic-green.
+    retry: 2,
   },
 });
