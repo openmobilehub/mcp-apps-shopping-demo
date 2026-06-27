@@ -1,7 +1,19 @@
 import { randomBytes } from "node:crypto";
-import { createOrder, requiredAgeForLines, LOYALTY_DISCOUNT_PCT, type CartItemInput, type Order, type PriceOpts } from "./catalog.js";
+import { createOrder, getProduct, requiredAgeForLines, LOYALTY_DISCOUNT_PCT, type CartItemInput, type Order, type PriceOpts } from "./catalog.js";
 import type { CompletedOrder } from "./orderStore.js";
 import { verificationStore } from "./verificationStore.js";
+import {
+  Attesto,
+  age,
+  membership,
+  payment,
+  required,
+  optional,
+  renderRequirements,
+  type GateOrder,
+  type PaymentMethod,
+  type VerificationManifestEntry,
+} from "@openmobilehub/attesto-gate";
 
 // Server-side age gate. The checkout page's payment lock is render-only, so a
 // direct POST to any completion endpoint could otherwise place an age-restricted
@@ -135,18 +147,6 @@ export function demoCompletedOrder(token: string): CompletedOrder | null {
   };
 }
 
-function formatMoney(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 // Verification state that drives the end-of-flow gating on the checkout page.
 export interface CheckoutVerification {
   ageVerified?: boolean;
@@ -163,169 +163,119 @@ function recomputeOrder(order: Order, loyaltyApplied: boolean): Order {
   return { ...order, subtotal, discount, total };
 }
 
+// The demo's checkout policy, resolved per-page into the SAME `requires` manifest
+// the `checkout` MCP tool surfaces: age 21+ (only when the cart has alcohol), an
+// optional membership discount, and payment (settles LAST). Passing it through the
+// shared renderer makes the page the buyer opens BE that manifest — one source of
+// truth for what's required.
+const hasAlcohol = (o: GateOrder) => o.lines.some((l) => l.minimumAge != null);
+const checkoutPolicy = [
+  required(age.over(21).when(hasAlcohol)),
+  optional(membership.discount(LOYALTY_DISCOUNT_PCT)),
+  required(payment.in("usd")),
+];
+
+// Re-derive the per-product age threshold + category onto each line server-side
+// (invariant #2 — `PricedCartLine` doesn't carry them; never trust the token) so
+// the conditional age gate resolves from the catalog.
+function toGateOrder(order: Order): GateOrder {
+  return {
+    id: order.id,
+    total: order.total,
+    currency: order.currency,
+    lines: order.lines.map((l) => ({
+      id: l.id,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      minimumAge: getProduct(l.id)?.minimumAge,
+      category: getProduct(l.id)?.category,
+    })),
+  };
+}
+
+// The demo is stateless: its ceremony decodes the order from the URL, so each
+// per-order approve link carries the encoded order TOKEN, not a bare id. Substitute
+// the demo's token-bearing `/credential-gate/*` links for the SDK's default approve
+// links (the storefront, by contrast, keeps the mounted `/attesto/*` links). The
+// shared renderer is route-agnostic — it follows whatever `approveUrl` each entry
+// carries — so this substitution is all the demo needs to home the gates onto its
+// own ceremony routes. The payment entry is rendered via the demo's own method group
+// (below), so it keeps the SDK link untouched.
+function withDemoApproveUrls(manifest: VerificationManifestEntry[], enc: string): VerificationManifestEntry[] {
+  return manifest.map((e) => {
+    if (e.credential === "age") return { ...e, approveUrl: `/credential-gate/age?order=${enc}` };
+    if (e.credential === "membership") return { ...e, approveUrl: `/credential-gate/loyalty?order=${enc}` };
+    return e;
+  });
+}
+
+// The demo's Shopify-style payment method group (passkey same-device, cross-device,
+// instant demo). Route-agnostic config the shared renderer turns into the radio group
+// + Pay CTA: the passkey/xdev methods navigate to the demo's `/payment-gate/*` routes;
+// the instant-demo method POSTs the order token to `/checkout/place-order`.
+function demoPaymentMethods(enc: string): PaymentMethod[] {
+  return [
+    {
+      value: "passkey",
+      name: "Pay with x402 Hedera · Passkey",
+      desc: "Authorize with this device's passkey — settles on-chain via the x402 protocol (test network).",
+      href: `/payment-gate/passkey?order=${enc}`,
+      checked: true,
+    },
+    {
+      value: "xdev",
+      name: "Authorize on my phone (cross-device)",
+      desc: "Scan a QR and approve with your phone's passkey or wallet.",
+      href: `/payment-gate/dc-payment?order=${enc}`,
+    },
+    {
+      value: "demo",
+      name: "Place order (instant demo)",
+      desc: "Skips the device prompt — no real charge, nothing settles.",
+      placeOrder: true,
+    },
+  ];
+}
+
 function renderCheckoutPage(baseOrder: Order, v: CheckoutVerification = {}, paid: CompletedOrder | null = null): string {
   const loyaltyApplied = !!v.loyaltyApplied;
   const ageVerified = !!v.ageVerified;
-  const recomputed = recomputeOrder(baseOrder, loyaltyApplied);
-  // A paid revisit arrives after completion cleared this order's verification,
-  // so `recomputed` would drop the discount the order was actually paid at and
-  // disagree with the recorded `paid.amount`. Anchor the displayed totals on
-  // that authoritative amount, deriving the discount row from the difference.
-  const order = paid
-    ? {
-        ...recomputed,
-        discount: Math.max(0, Math.round((recomputed.subtotal - paid.amount) * 100) / 100),
-        total: paid.amount,
-      }
-    : recomputed;
+  // Re-price for the current loyalty state so the displayed total — and the token the
+  // payment gates bind to — reflect what the buyer has done. On a PAID revisit the
+  // shared renderer anchors the displayed totals on the recorded `paid.amount` (the
+  // verification was cleared at completion), so we don't pre-anchor here.
+  const order = recomputeOrder(baseOrder, loyaltyApplied);
   // Discounted token: the payment gates decode this and bind to order.total.
   const token = encodeOrder(order);
   const enc = encodeURIComponent(token);
-  const requiredAge = requiredAgeForLines(order.lines);
-  const hasAgeRestricted = requiredAge != null;
-  const blocked = hasAgeRestricted && !ageVerified;
 
-  const rows = order.lines
-    .map((l) => `<tr><td>${l.quantity}× ${escapeHtml(l.name)}</td><td class="num">${formatMoney(l.lineTotal, l.currency)}</td></tr>`)
-    .join("\n");
+  // Resolve the policy to the same manifest the MCP tool surfaces, homed onto the
+  // demo's token-bearing ceremony links, then render the ONE shared page (T030).
+  const attesto = new Attesto({ walletOrigin: getCheckoutBaseUrl() });
+  const manifest = withDemoApproveUrls(attesto.requirements(toGateOrder(order), checkoutPolicy), enc);
 
-  const loyaltySection = loyaltyApplied
-    ? `<div class="ok">✓ Loyalty discount applied (${LOYALTY_DISCOUNT_PCT}% off)</div>`
-    : `<a class="btn-ghost" href="/credential-gate/loyalty?order=${enc}">🎟️ Apply loyalty discount (${LOYALTY_DISCOUNT_PCT}% off)</a>`;
-
-  const ageSection = !hasAgeRestricted
-    ? ""
-    : ageVerified
-      ? `<div class="ok">✓ Age verified — ${requiredAge}+</div>`
-      : `<div class="warn">🔒 This order contains age-restricted items. Verify you're ${requiredAge} or older to continue.</div>
-         <a class="btn-age" href="/credential-gate/age?order=${enc}">Verify age (${requiredAge}+)</a>`;
-
-  // Shopify-style payment section: one radio group of methods, one Pay CTA.
-  // The selected method decides where the CTA goes (gate page) or what it does
-  // (instant demo). When age-blocked, the whole group is withheld — server-side
-  // enforcement still backs this (the lock is not just rendered).
-  // Revisited after completion: the page reports the payment instead of
-  // re-offering methods. Settlement details (when the payment settled on-chain)
-  // carry the public proof.
-  const paidSection = paid
-    ? `<div class="ok" style="font-size:16px;">\u2713 Order paid \u00b7 ${formatMoney(paid.amount, paid.currency)}${paid.settlement ? " via x402" : paid.method === "passkey" ? " via passkey" : ""}</div>` +
-      (paid.settlement
-        ? `<div class="note" style="text-align:left;">Settled on ${escapeHtml(paid.settlement.network)} \u00b7 paid from ${escapeHtml(paid.settlement.payer.accountId)} \u00b7 <a href="${paid.settlement.hashscanUrl}" target="_blank" rel="noopener">View on HashScan</a></div>`
-        : `<div class="note" style="text-align:left;">No on-chain settlement for this payment method.</div>`)
-    : "";
-
-  const payLabel = `Pay ${formatMoney(order.total, order.currency)}`;
-  const paymentSection = blocked
-    ? `<div class="locked">Payment is locked until age verification is complete.</div>`
-    : `<h2 class="pm-head">Payment method</h2>
-  <div class="pm-group" role="radiogroup" aria-label="Payment method">
-    <label class="pm-row">
-      <input type="radio" name="pm" value="passkey" checked />
-      <span class="pm-text"><span class="pm-name">Pay with x402 Hedera · Passkey</span>
-      <span class="pm-desc">Authorize with this device's passkey — settles on-chain via the x402 protocol (test network).</span></span>
-    </label>
-    <label class="pm-row">
-      <input type="radio" name="pm" value="xdev" />
-      <span class="pm-text"><span class="pm-name">Authorize on my phone (cross-device)</span>
-      <span class="pm-desc">Scan a QR and approve with your phone's passkey or wallet.</span></span>
-    </label>
-    <label class="pm-row">
-      <input type="radio" name="pm" value="demo" />
-      <span class="pm-text"><span class="pm-name">Place order (instant demo)</span>
-      <span class="pm-desc">Skips the device prompt — no real charge, nothing settles.</span></span>
-    </label>
-  </div>
-  <button id="pay" class="btn-pay">${payLabel}</button>
-  <div class="note">You'll confirm the exact amount with your device. Demo — no real charge.</div>`;
-
-  const placeScript = blocked
-    ? ""
-    : `<script>
-    const GATE_URLS = { passkey: '/payment-gate/passkey?order=${enc}', xdev: '/payment-gate/dc-payment?order=${enc}' };
-    const PAY_LABEL = ${JSON.stringify(payLabel)};
-    const pay = document.getElementById('pay');
-    const selected = () => document.querySelector('input[name="pm"]:checked').value;
-    // The CTA narrates the chosen method, Shopify-style.
-    const relabel = () => {
-      const m = selected();
-      pay.textContent = m === 'demo' ? 'Place order (instant demo)' : PAY_LABEL;
-    };
-    document.querySelectorAll('input[name="pm"]').forEach((r) => r.addEventListener('change', relabel));
-    relabel();
-    pay.addEventListener('click', async function () {
-      const m = selected();
-      if (m !== 'demo') { window.location.href = GATE_URLS[m]; return; }
-      this.disabled = true;
-      this.textContent = 'Placing order…';
-      try {
-        const res = await fetch('/checkout/place-order', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ order: ${JSON.stringify(token)} }),
-        });
-        if (!res.ok) throw new Error('place-order failed: ' + res.status);
-        this.textContent = 'Order placed ✓ (demo)';
-      } catch (e) {
-        this.disabled = false;
-        this.textContent = 'Place order (instant demo)';
-        alert('Could not place the order. Please try again.');
-      }
-    });
-  </script>`;
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Checkout · ${escapeHtml(order.id)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
-  h1 { font-size: 20px; }
-  .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .disc td { color: #0a7f2e; }
-  .total { font-weight: 600; font-size: 16px; }
-  .total td { border-bottom: none; padding-top: 16px; }
-  .note { color: #888; font-size: 12px; margin-top: 12px; text-align: center; }
-  .section { margin-top: 20px; }
-  .ok { color: #0a7f2e; font-weight: 600; font-size: 14px; padding: 10px 0; }
-  .warn { background: #fff7ed; border-left: 4px solid #d97706; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #92400e; margin-bottom: 10px; }
-  .locked { color: #b00020; font-size: 13px; text-align: center; padding: 14px; border: 1px dashed #e0a0a0; border-radius: 8px; margin-top: 20px; }
-  a.btn-ghost, a.btn-age { display:block; text-align:center; text-decoration:none; border-radius:8px; box-sizing:border-box; }
-  a.btn-ghost { margin-top: 12px; padding: 12px; font-size: 14px; font-weight: 500; color: #1a7f37; background: #fff; border: 1px solid #1a7f37; }
-  a.btn-age { margin-top: 4px; padding: 14px; font-size: 15px; font-weight: 600; color: #fff; background: #b00020; }
-  .pm-head { font-size: 15px; margin: 0 0 8px; }
-  .pm-group { border: 1px solid #d0d0d0; border-radius: 10px; overflow: hidden; }
-  .pm-row { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #eee; }
-  .pm-row:last-child { border-bottom: none; }
-  .pm-row:has(input:checked) { background: #f2faf4; box-shadow: inset 3px 0 0 #1a7f37; }
-  .pm-row input { margin-top: 3px; accent-color: #1a7f37; }
-  .pm-text { display: block; }
-  .pm-name { display: block; font-size: 14px; font-weight: 600; }
-  .pm-desc { display: block; font-size: 12px; color: #666; margin-top: 2px; }
-  button.btn-pay { margin-top: 14px; width: 100%; padding: 14px; font-size: 15px; font-weight: 600; color: #fff; background: #1a7f37; border: none; border-radius: 8px; cursor: pointer; }
-  button { display: block; margin-top: 12px; width: 100%; padding: 12px; font-size: 14px; font-weight: 500; color: #1a1a1a; background: #fff; border: 1px solid #d0d0d0; border-radius: 8px; cursor: pointer; box-sizing: border-box; }
-  button:disabled { color: #888; cursor: default; }
-</style>
-</head>
-<body>
-  <h1>Checkout</h1>
-  <div class="meta">Order ${escapeHtml(order.id)} · ${order.itemCount} item(s)</div>
-  <table>
-    ${rows}
-    ${order.discount > 0 ? `<tr class="disc"><td>Loyalty discount (${LOYALTY_DISCOUNT_PCT}%)</td><td class="num">-${formatMoney(order.discount, order.currency)}</td></tr>` : ""}
-    <tr class="total"><td>Total</td><td class="num">${formatMoney(order.total, order.currency)}</td></tr>
-  </table>
-
-  ${paid ? `<div class="section">${paidSection}</div>` : `<div class="section">${loyaltySection}</div>
-  ${ageSection ? `<div class="section">${ageSection}</div>` : ""}
-  <div class="section">${paymentSection}</div>
-  ${placeScript}`}
-</body>
-</html>`;
+  return renderRequirements(
+    order,
+    manifest,
+    { ageVerified, loyaltyApplied },
+    {
+      payment: { methods: demoPaymentMethods(enc), placeOrderPath: "/checkout/place-order", orderToken: token },
+      paid: paid
+        ? {
+            amount: paid.amount,
+            currency: paid.currency,
+            method: paid.method,
+            settlement: paid.settlement
+              ? {
+                  network: paid.settlement.network,
+                  payer: { accountId: paid.settlement.payer.accountId },
+                  hashscanUrl: paid.settlement.hashscanUrl,
+                }
+              : null,
+          }
+        : null,
+    },
+  );
 }
 
 function renderNotFound(): string {
