@@ -6,6 +6,7 @@ dist/
 
 # Local git worktrees
 .worktrees/
+.claude/worktrees/
 
 # Tooling scratch
 .superpowers/
