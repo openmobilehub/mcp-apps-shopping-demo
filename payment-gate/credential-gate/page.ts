@@ -76,32 +76,45 @@ export function renderCredentialPage(args: PageArgs): string {
       doneEl.style.display = "block";
     }
 
-    go.addEventListener("click", async () => {
-      go.disabled = true;
-      if (!("credentials" in navigator) || !window.DigitalCredential) {
-        notice("This browser doesn't support <code>navigator.credentials.get({digital})</code> (need <strong>Chrome 141+</strong>)." + (demo ? " Use the instant-demo button below." : ""));
-        go.disabled = false;
+    // Pre-fetch the request so navigator.credentials.get() can be called
+    // SYNCHRONOUSLY inside the tap. iOS WebKit drops the transient user
+    // activation across an await, so we must not fetch between the click and
+    // get(). We keep a fresh pre-fetched request ready at all times.
+    let reqData = null;
+    function prefetch() {
+      reqData = null;
+      fetch(base + "/request" + location.search).then((r) => r.json()).then((d) => { reqData = d; }).catch(() => {});
+    }
+    prefetch();
+
+    go.addEventListener("click", () => {
+      if (!navigator.credentials || !navigator.credentials.get) {
+        notice("This browser doesn't support the Digital Credentials API. Use the instant-demo button below.");
         return;
       }
-      try {
-        step("→ GET signed request");
-        const { request, readerContextToken } = await fetch(base + "/request").then((r) => r.json());
-        step("→ navigator.credentials.get({digital}) — Chrome should show a QR…");
-        const result = await navigator.credentials.get({ digital: { requests: [{ protocol: "openid4vp-v1-signed", data: { request } }] }, mediation: "required" });
-        let data = result?.data ?? null;
-        if (typeof data === "string") { try { data = JSON.parse(data); } catch {} }
-        step("→ verify");
-        const out = await fetch(base + "/verify", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ readerContextToken, order: ORDER, result: { protocol: result?.protocol ?? null, data } }),
-        }).then((r) => r.json());
-        if (!out.verified) throw new Error(out.error || "not verified");
-        step("✓ verified", "ok");
-        done();
-      } catch (err) {
-        step("✗ " + (err?.message ?? String(err)), "err");
-        go.disabled = false;
-      }
+      if (!reqData) { notice("Preparing the request — tap again in a second."); prefetch(); return; }
+      go.disabled = true;
+      const rd = reqData;
+      step("→ navigator.credentials.get({digital}) — choose your wallet…");
+      // Called synchronously (no await before it) to keep the user activation.
+      navigator.credentials.get({ digital: { requests: rd.requests }, mediation: "required" })
+        .then(async (result) => {
+          let data = result && result.data != null ? result.data : null;
+          if (typeof data === "string") { try { data = JSON.parse(data); } catch (e) {} }
+          step("→ verify (" + ((result && result.protocol) || "?") + ")");
+          const out = await fetch(base + "/verify", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ readerContextToken: rd.readerContextToken, mdocContextToken: rd.mdocContextToken, order: ORDER, result: { protocol: (result && result.protocol) || null, data } }),
+          }).then((r) => r.json());
+          if (!out.verified) throw new Error(out.error || "not verified");
+          step("✓ verified", "ok");
+          done();
+        })
+        .catch((err) => {
+          step("✗ " + ((err && err.message) || String(err)), "err");
+          go.disabled = false;
+          prefetch(); // fresh request for the next attempt
+        });
     });
 
     if (demo) demo.addEventListener("click", async () => {
