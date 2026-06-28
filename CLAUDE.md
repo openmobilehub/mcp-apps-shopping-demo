@@ -12,6 +12,17 @@ One server, one small UI bundle (`src/`); each host renders the same widget nati
 or — in a no-GUI host — drives the whole flow from chat via MCP tools. TypeScript/Node;
 tests run with `npm run test` (vitest). `npm run build` typechecks + builds.
 
+## Status & decisions — read/update `STATUS.md`
+
+`STATUS.md` (repo root) is the single source of truth for project state. **Read it at the
+start of every working session and update it at the end.** It leads with **"Decisions for
+you"** (each a checkbox + recommendation the maintainer resolves inline), then in-flight /
+next, a rolling Done log (linked commits), and standing constraints. It is a *dashboard* —
+link out to `specs/*/tasks.md`, `docs/PUBLISHING.md`, the 003 tail plan, etc. for detail
+rather than duplicating them. Keep it current: move a resolved decision into Done; don't let
+it rot. (Don't make the maintainer ask "what's done / pending / blocked on me" — that's what
+this file answers.)
+
 ## Architecture (where things live)
 
 - `server.ts` / `app.ts` / `main.ts` — MCP tools + HTTP routes + stdio/http entrypoints.
