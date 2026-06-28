@@ -1,7 +1,7 @@
 # Project Status — Attesto v0.1
 
 _Single source of truth for what's done, what's next, and what's waiting on you._
-_Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 379 pass / 1 skip._
+_Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 216 pass / 0 skip (003 cutover done — demo is a thin consumer; the package suites are the source of truth)._
 
 > **How this file works.** Claude keeps it current at the end of every working session (and
 > re-reads it at the start). You resolve a decision by checking its box (or just say "do D1–D3
@@ -14,11 +14,8 @@ _Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 379
 
 Check a box (or tell me). Each carries my recommendation; full reasoning is in the linked plan.
 
-- [ ] **D7 — Demo widget at retirement.** When retiring the old demo code, the demo's `src/` widget build
-      (vite → `dist/mcp-app.html`) becomes redundant (the package ships its own extracted widget).
-      _Rec: **drop `src/` + the demo widget build; use the package's widget**._ (Arises during cutover step 3.)
-- [ ] **D5 — Publish `0.1.0`?** Needs your `@openmobilehub` npm auth. Order is load-bearing: **`attesto-gate`
-      first, then `attesto-storefront`** (it deps on it via `^0.1.0`).  → `docs/PUBLISHING.md`
+- [ ] **D5 — Publish `0.1.0`?** Needs your `@openmobilehub` npm auth. Now sequenced to publish **from the new
+      `openmobilehub/attesto` repo** (gate first, then storefront — it deps on the gate via `^0.1.0`).  → `docs/PUBLISHING.md`
 - [ ] **D6 — Redeploy the preview?** `attesto-storefront.vercel.app` is one deploy *behind* — it predates the
       place-order security fix. Trivial to redeploy; I held off to honor "nothing outward-facing."
 
@@ -26,34 +23,29 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ### ✔ Recently decided
 
-- **D1–D4 — 003 cutover:** go-ahead, **as recommended** (id+store transport · `/attesto/*` routes · delete
-  `payment-gate/**` · demo *becomes* the composition with its catalog injected). **Executing now** — see
-  In flight below.
+- **D1–D4 + D7 — 003 cutover: ✅ DONE** (as recommended). Demo is a thin consumer of the packages; the old
+  implementation + the demo widget are retired; 216 tests green. See Done log.
 - **D0 — Name:** proceed as **Attesto** for now; a rename is a deferred, accepted-cost find-replace if we choose
   it (a cleared shortlist of alternatives is saved as reference — `docs/naming-clearance.md`). Naming no longer
   blocks the roadmap. (Publishing is the real point-of-no-return — a pro trademark search is still advised before `0.1.0`.)
-- **Repo split → `openmobilehub/attesto`:** after the `0.1.0` publish. **Cutoff (triggers + backstop) + migration
-  runbook:** `docs/repo-migration-plan.md`. One open item: confirm the ~2026-08-25 backstop only if you want the
-  public repo standing before the GDC talk.
+- **Repo split → `openmobilehub/attesto`:** **re-sequenced — now the next priority**, and `0.1.0` publishes
+  **FROM the new repo** (with dev + reference docs), not from here. **Cutoff (now met) + runbook:**
+  `docs/repo-migration-plan.md`. Open: confirm the optional ~2026-08-25 pre-GDC backstop.
 
 ---
 
 ## 🔨 In flight / next
 
-- **003 tail cutover** — **IN PROGRESS** (D1–D4 go-ahead). ✅ step 1 `composeStorefront()` factory (`a…`),
-  ✅ step 2 `api/index.ts` → composition — **the demo consumes the packages** (green, smoke-verified: discovery
-  200, `/mcp` 9 tools, gated whiskey checkout) (`985c6b1`). **Remaining:** retire the now-dead demo code
-  (`app.ts`, `server.ts`, `checkout.ts` token path, `payment-gate/**`, demo stores, `src/` widget per **D7**) +
-  their tests (~28 `payment-gate/**` superseded by the package tests) → final gate. Prod `mcp-apps-nine`
-  unchanged until a **separate, reviewed** cutover deploy (your call).
-- **Publish 0.1.0** — blocked on **D5** (your npm auth). _Publishing cements the name — a pro trademark search is
-  still advised first (`docs/naming-clearance.md`)._ Pre-flight all green per `docs/PUBLISHING.md`.
-- **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); sequence **after** the 003
-  tail to avoid churning `mandate.ts` twice.
-- **Preview redeploy** — blocked on **D6** (trivial).
-- **Repo split → `openmobilehub/attesto`** — _decided: after the `0.1.0` publish._ Concrete **cutoff** (primary
-  trigger = 003 tail merged + `0.1.0` published; optional ~Aug-25 backstop) + **migration runbook** (history-preserving
-  extract, tooling port, demo dependency flip, rollback): `docs/repo-migration-plan.md`.
+- **▶ NEXT PRIORITY — Repo migration → `openmobilehub/attesto`.** The 003 cutover is done, so the trigger is
+  **met** — move the packages (+ examples + specs + **dev docs + reference docs**) to their own repo, stand up
+  CI/DCO/branch-protection, then **publish `0.1.0` FROM the new repo** (gate then storefront), and finally flip
+  this repo's demo to the published dep. Full runbook + sequence: `docs/repo-migration-plan.md`. _Open: confirm
+  the optional ~2026-08-25 pre-GDC backstop. A pro trademark search is still advised before publish
+  (`docs/naming-clearance.md`)._
+- **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); after the migration settles.
+- **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
+- **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
+  composition, so a deploy serves the thin-consumer demo. **Your call** (separate, reviewed).
 
 ---
 
@@ -61,6 +53,7 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 | What | Commit |
 | :-- | :-- |
+| **003 cutover COMPLETE** — demo is a thin consumer of the packages (factory → entrypoint flip → main.ts rewire → deleted 60 dead files → retired the demo widget); 216 tests green | `da21527`…`071df28` |
 | Security: closed the `place-order` gate bypass (invariant 1) + load-bearing test | `2a6ca24` |
 | 003 tail: decision-ready implementation plan | `649cd0e` |
 | Spec: signed Cart Mandate (004) + research | `004a646` |
