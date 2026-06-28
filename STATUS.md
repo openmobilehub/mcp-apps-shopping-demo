@@ -36,12 +36,14 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ## 🔨 In flight / next
 
-- **▶ NEXT PRIORITY — Repo migration → `openmobilehub/attesto`.** The 003 cutover is done, so the trigger is
-  **met** — move the packages (+ examples + specs + **dev docs + reference docs**) to their own repo, stand up
-  CI/DCO/branch-protection, then **publish `0.1.0` FROM the new repo** (gate then storefront), and finally flip
-  this repo's demo to the published dep. Full runbook + sequence: `docs/repo-migration-plan.md`. _Open: confirm
-  the optional ~2026-08-25 pre-GDC backstop. A pro trademark search is still advised before publish
-  (`docs/naming-clearance.md`)._
+- **▶ NEXT PRIORITY — Repo migration → `openmobilehub/attesto`.** The 003 cutover is done + the migration is now
+  **turnkey**: dev + reference docs, new-repo scaffolding (root `package.json`, `vitest.config.ts`, CI +
+  publish workflows), and the history-preserving migration script are **staged under `docs/attesto/` +
+  `scripts/migrate-to-attesto-repo.sh`**. **Remaining (needs you):** (1) create the empty `openmobilehub/attesto`
+  GitHub repo; (2) run the script (needs `git-filter-repo`); (3) review → push → set branch-protection +
+  `CLAUDE_CODE_OAUTH_TOKEN`/`NPM_TOKEN` secrets; (4) **publish `0.1.0`** (Release → `publish.yml`, gate then
+  storefront); (5) flip this repo's demo to the published dep. Runbook: `docs/repo-migration-plan.md`. _Open:
+  confirm the optional ~2026-08-25 backstop; a pro trademark search is still advised before publish._
 - **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); after the migration settles.
 - **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
 - **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
@@ -53,6 +55,7 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 | What | Commit |
 | :-- | :-- |
+| **Migration prep** — staged the `openmobilehub/attesto` repo (dev + reference docs, scaffolding, history-preserving migration script); docs verified accurate + honest | `docs/attesto/` |
 | **003 cutover COMPLETE** — demo is a thin consumer of the packages (factory → entrypoint flip → main.ts rewire → deleted 60 dead files → retired the demo widget); 216 tests green | `da21527`…`071df28` |
 | Security: closed the `place-order` gate bypass (invariant 1) + load-bearing test | `2a6ca24` |
 | 003 tail: decision-ready implementation plan | `649cd0e` |
