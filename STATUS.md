@@ -40,6 +40,10 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 - **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); sequence **after** the 003
   tail to avoid churning `mandate.ts` twice.
 - **Preview redeploy** — blocked on **D6** (trivial).
+- **Repo split → `openmobilehub/attesto`** — _decided 2026-06-28: do it **after** the `0.1.0` publish, not now._
+  Rationale: keep the monorepo through the 003 tail so the last cross-boundary refactor stays a one-PR / one-test
+  job; the packages are already self-contained, so the move is then mechanical (lift `packages/` out; the demo
+  already deps on the published `@openmobilehub/attesto-*`). Not re-litigating before publish.
 
 ---
 
