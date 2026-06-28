@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{dist/**,node_modules/@simplewebauthn/browser/**}",
+      "includeFiles": "{dist/**,packages/attesto-storefront/dist/**,packages/attesto-gate/dist/**,node_modules/@simplewebauthn/browser/**}",
       "maxDuration": 60
     }
   },

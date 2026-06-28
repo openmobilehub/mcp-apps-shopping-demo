@@ -16,5 +16,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "main.ts", "catalog.ts", "catalog.test.ts", "demo-app.ts", "api/index.ts", "api/storefront.ts", "api/compose-storefront.ts"]
+  "include": ["main.ts", "catalog.ts", "catalog.test.ts", "demo-app.ts", "api/index.ts", "api/storefront.ts", "api/compose-storefront.ts"]
 }

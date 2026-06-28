@@ -12,11 +12,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "vite",
-    "build:ui": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build:packages": "npm run build --workspaces --if-present",
-    "build": "npm run build:packages && npm run typecheck && npm run build:ui && npm run build:server",
+    "build": "npm run build:packages && npm run typecheck && npm run build:server",
     "start:stdio": "node dist/main.js --stdio",
     "start:http": "node dist/main.js",
     "test": "vitest run",
