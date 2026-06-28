@@ -14,15 +14,6 @@ _Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 379
 
 Check a box (or tell me). Each carries my recommendation; full reasoning is in the linked plan.
 
-- [ ] **D0 — Name: commit to "Attesto" or reconsider?** ⚠️ _gates D5 (publish) + the repo split._
-      Clearance sweep found exact-name collisions in/adjacent to our space: **attesto.dev** (hardware-attested
-      privileged-access security — same category, holds the `.dev`), **attesto.com** (AI hiring + identity-fraud
-      "Trust Layer", owns the `.com`, claims the mark), **attesto.app** (compliance attestations), a near-homophone
-      **"Attesso"** (agentic-payments SDK), and an npm "attestation = build-provenance" confusion risk. `@openmobilehub/attesto`
-      npm handle is free and the word resonates with the GDC/EU-wallet crowd, but `.com/.dev/.app` are gone and the
-      brand is crowded. _Rec: **professional USPTO + EUIPO knockout search before publishing**; treat as a real
-      keep-vs-rename call now (cheapest moment). Don't launch under the name until cleared._
-      → `docs/naming-clearance.md`
 - [ ] **D1 — 003 order transport.** Demo becomes a `createStorefront()` + `mount()` consumer (id + store),
       or teach the package a token-decode path so the demo keeps `encodeOrder`?
       _Rec: **id + store** (the demo becomes the composition; one transport)._ → plan D-A
@@ -40,20 +31,28 @@ Check a box (or tell me). Each carries my recommendation; full reasoning is in t
 
 Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremony-extraction/tail-implementation-plan.md`
 
+### ✔ Recently decided
+
+- **D0 — Name:** proceed as **Attesto** for now; a rename is a deferred, accepted-cost find-replace if we choose
+  it (a cleared shortlist of alternatives is saved as reference — `docs/naming-clearance.md`). Naming no longer
+  blocks the roadmap. (Publishing is the real point-of-no-return — a pro trademark search is still advised before `0.1.0`.)
+- **Repo split → `openmobilehub/attesto`:** after the `0.1.0` publish. **Cutoff (triggers + backstop) + migration
+  runbook:** `docs/repo-migration-plan.md`. One open item: confirm the ~2026-08-25 backstop only if you want the
+  public repo standing before the GDC talk.
+
 ---
 
 ## 🔨 In flight / next
 
 - **003 tail cutover** — blocked on **D1–D4**. Smallest-green-steps sequencing is in the tail plan.
-- **Publish 0.1.0** — blocked on **D5** (your npm auth) **and D0** (name clearance — publishing cements the name).
-  Pre-flight all green per `docs/PUBLISHING.md`.
+- **Publish 0.1.0** — blocked on **D5** (your npm auth). _Publishing cements the name — a pro trademark search is
+  still advised first (`docs/naming-clearance.md`)._ Pre-flight all green per `docs/PUBLISHING.md`.
 - **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); sequence **after** the 003
   tail to avoid churning `mandate.ts` twice.
 - **Preview redeploy** — blocked on **D6** (trivial).
-- **Repo split → `openmobilehub/attesto`** — _decided 2026-06-28: do it **after** the `0.1.0` publish, not now._
-  Rationale: keep the monorepo through the 003 tail so the last cross-boundary refactor stays a one-PR / one-test
-  job; the packages are already self-contained, so the move is then mechanical (lift `packages/` out; the demo
-  already deps on the published `@openmobilehub/attesto-*`). Not re-litigating before publish.
+- **Repo split → `openmobilehub/attesto`** — _decided: after the `0.1.0` publish._ Concrete **cutoff** (primary
+  trigger = 003 tail merged + `0.1.0` published; optional ~Aug-25 backstop) + **migration runbook** (history-preserving
+  extract, tooling port, demo dependency flip, rollback): `docs/repo-migration-plan.md`.
 
 ---
 
