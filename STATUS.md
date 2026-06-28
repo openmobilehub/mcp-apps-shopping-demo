@@ -36,14 +36,14 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ## 🔨 In flight / next
 
-- **▶ NEXT PRIORITY — Repo migration → `openmobilehub/attesto`.** The 003 cutover is done + the migration is now
-  **turnkey**: dev + reference docs, new-repo scaffolding (root `package.json`, `vitest.config.ts`, CI +
-  publish workflows), and the history-preserving migration script are **staged under `docs/attesto/` +
-  `scripts/migrate-to-attesto-repo.sh`**. **Remaining (needs you):** (1) create the empty `openmobilehub/attesto`
-  GitHub repo; (2) run the script (needs `git-filter-repo`); (3) review → push → set branch-protection +
-  `CLAUDE_CODE_OAUTH_TOKEN`/`NPM_TOKEN` secrets; (4) **publish `0.1.0`** (Release → `publish.yml`, gate then
-  storefront); (5) flip this repo's demo to the published dep. Runbook: `docs/repo-migration-plan.md`. _Open:
-  confirm the optional ~2026-08-25 backstop; a pro trademark search is still advised before publish._
+- **✅ Repo migration → `openmobilehub/attesto` DONE.** The library is live at
+  https://github.com/openmobilehub/attesto (history-preserved, 95 commits; CI green; `main` branch-protected;
+  docs + scaffolding in place). **Remaining (needs you, in the NEW repo):** (1) add the **`NPM_TOKEN`** secret;
+  (2) **publish `0.1.0`** — cut a GitHub Release → `publish.yml` (gate then storefront); optional
+  `CLAUDE_CODE_OAUTH_TOKEN` secret for the auto-review.
+- **Flip this demo to the published packages** — AFTER `0.1.0` is on npm: change `@openmobilehub/attesto-*`
+  from the workspace to `^0.1.x` and remove `packages/` here. (Until then the demo keeps building from the
+  workspace.) Runbook: `docs/repo-migration-plan.md`.
 - **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); after the migration settles.
 - **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
 - **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
