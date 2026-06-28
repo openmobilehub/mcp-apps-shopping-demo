@@ -14,16 +14,9 @@ _Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 379
 
 Check a box (or tell me). Each carries my recommendation; full reasoning is in the linked plan.
 
-- [ ] **D1 — 003 order transport.** Demo becomes a `createStorefront()` + `mount()` consumer (id + store),
-      or teach the package a token-decode path so the demo keeps `encodeOrder`?
-      _Rec: **id + store** (the demo becomes the composition; one transport)._ → plan D-A
-- [ ] **D2 — 003 route naming.** Demo routes move `/payment-gate/*` + `/credential-gate/*` → `/attesto/*`,
-      or add back-compat aliases?  _Rec: **move to `/attesto/*`** (aliases are tech debt)._ → plan D-B
-- [ ] **D3 — `payment-gate/` disposition.** Collapse to thin re-export shims, or delete outright (package
-      tests supersede the ~28 `payment-gate/**` tests)?  _Rec: **delete**._ → plan D-C
-- [ ] **D4 — 003 end state.** Make the committed `api/index.ts` the composition **permanently** (the preview
-      *is* the demo), retire `app.ts`'s bespoke routes, and cut `mcp-apps-nine` over in a **separate, reviewed**
-      deploy?  _Rec: **yes** (this is the real "demo = thin consumer")._ → plan D-D
+- [ ] **D7 — Demo widget at retirement.** When retiring the old demo code, the demo's `src/` widget build
+      (vite → `dist/mcp-app.html`) becomes redundant (the package ships its own extracted widget).
+      _Rec: **drop `src/` + the demo widget build; use the package's widget**._ (Arises during cutover step 3.)
 - [ ] **D5 — Publish `0.1.0`?** Needs your `@openmobilehub` npm auth. Order is load-bearing: **`attesto-gate`
       first, then `attesto-storefront`** (it deps on it via `^0.1.0`).  → `docs/PUBLISHING.md`
 - [ ] **D6 — Redeploy the preview?** `attesto-storefront.vercel.app` is one deploy *behind* — it predates the
@@ -33,6 +26,9 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ### ✔ Recently decided
 
+- **D1–D4 — 003 cutover:** go-ahead, **as recommended** (id+store transport · `/attesto/*` routes · delete
+  `payment-gate/**` · demo *becomes* the composition with its catalog injected). **Executing now** — see
+  In flight below.
 - **D0 — Name:** proceed as **Attesto** for now; a rename is a deferred, accepted-cost find-replace if we choose
   it (a cleared shortlist of alternatives is saved as reference — `docs/naming-clearance.md`). Naming no longer
   blocks the roadmap. (Publishing is the real point-of-no-return — a pro trademark search is still advised before `0.1.0`.)
@@ -44,7 +40,12 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ## 🔨 In flight / next
 
-- **003 tail cutover** — blocked on **D1–D4**. Smallest-green-steps sequencing is in the tail plan.
+- **003 tail cutover** — **IN PROGRESS** (D1–D4 go-ahead). ✅ step 1 `composeStorefront()` factory (`a…`),
+  ✅ step 2 `api/index.ts` → composition — **the demo consumes the packages** (green, smoke-verified: discovery
+  200, `/mcp` 9 tools, gated whiskey checkout) (`985c6b1`). **Remaining:** retire the now-dead demo code
+  (`app.ts`, `server.ts`, `checkout.ts` token path, `payment-gate/**`, demo stores, `src/` widget per **D7**) +
+  their tests (~28 `payment-gate/**` superseded by the package tests) → final gate. Prod `mcp-apps-nine`
+  unchanged until a **separate, reviewed** cutover deploy (your call).
 - **Publish 0.1.0** — blocked on **D5** (your npm auth). _Publishing cements the name — a pro trademark search is
   still advised first (`docs/naming-clearance.md`)._ Pre-flight all green per `docs/PUBLISHING.md`.
 - **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); sequence **after** the 003
