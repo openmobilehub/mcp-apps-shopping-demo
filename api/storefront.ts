@@ -10,4 +10,4 @@
 // the SAME factory with its own catalog at the 003 cutover.
 import { composeStorefront } from "./compose-storefront.js";
 
-export default composeStorefront({ namespace: "attesto-storefront-preview" });
+export default composeStorefront({ namespace: "attesto-storefront-preview" }).app;

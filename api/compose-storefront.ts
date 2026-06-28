@@ -6,9 +6,8 @@
 // the committed demo (api/index.ts), differing only by injected catalog + Redis
 // namespace. Redis-backed stores survive Vercel instance splits; settlement is the
 // injected Hedera/x402 seam. Without Redis env it falls back to in-memory (dev/test).
-import type { Express } from "express";
 import { Redis } from "@upstash/redis";
-import { createStorefront, type CompletedOrderRecord } from "@openmobilehub/attesto-storefront/server";
+import { createStorefront, type Storefront, type CompletedOrderRecord } from "@openmobilehub/attesto-storefront/server";
 import type { Order, Product, Review } from "@openmobilehub/attesto-storefront";
 import {
   Attesto,
@@ -109,11 +108,12 @@ function makeSettle(cfg: HederaSettlementConfig) {
 const hasAlcohol = (order: GateOrder): boolean => order.lines.some((l) => l.minimumAge != null);
 
 /**
- * Build the composed storefront app: createStorefront over Redis-backed stores (when
+ * Build the composed storefront: createStorefront over Redis-backed stores (when
  * configured) + the Hedera settle seam, with the ceremony mounted and the age /
- * membership / payment policy gated (payment settles last). Returns the Express app.
+ * membership / payment policy gated (payment settles last). Returns the full
+ * Storefront (`.app` for HTTP, `.mcpServer()` for stdio, `.listen()` for dev).
  */
-export function composeStorefront(opts: ComposeOptions): Express {
+export function composeStorefront(opts: ComposeOptions): Storefront {
   const redis = redisOrNull();
   const hedera = hederaSettlementConfig(process.env);
   const ns = opts.namespace;
@@ -144,5 +144,5 @@ export function composeStorefront(opts: ComposeOptions): Express {
       required(payment.in("usd")),
     ]),
   );
-  return store.app;
+  return store;
 }
