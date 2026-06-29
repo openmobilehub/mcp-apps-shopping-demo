@@ -55,12 +55,15 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
   Workflow." Auto-review: `CLAUDE_CODE_OAUTH_TOKEN` **is set** and PR #5's standard workflow is installed, so reviews
   run. The `CLAUDE_REVIEW_ENABLED` var is **not** set, so PR #2's *gated* workflow stays off — now redundant; consider
   deleting it to avoid double-reviews.
-- **🌐 Website thread — design APPROVED, spec committed** (`docs/superpowers/specs/2026-06-28-attesto-website-design.md`,
-  `f25374b`). Animated hero "Watch the agent ask" (Treatment A) on a single static page; lives in `site/` of
-  `openmobilehub/attesto`, GitHub Pages, decoupled from the npm release. **Next:** user reviews the spec → writing-plans
-  → build `site/` → PR. Independent of `packages/**` — no collision with SDK work.
-- **SDK follow-up PRs (buildable now, parallel thread):** Cart Mandate ↔ PaymentMandate reconciliation; stateless
-  transport; e2e issuance wiring (all noted in PR #1).
+- **🌐 Website thread — design APPROVED + spec + plan committed.** Spec `c44c4ee`, plan
+  `docs/superpowers/plans/2026-06-28-attesto-website.md` (`fcb51a3`). Animated hero "Watch the agent ask" (Treatment A),
+  single self-contained static page; lives in its **own repo `openmobilehub/attesto-website`** (GitHub Pages, decoupled
+  from npm). **Blocked on you:** create the empty `openmobilehub/attesto-website` repo → then I execute the 5-task plan
+  (productionize `index.html` → Pages workflow → PR). Execution mode (subagent-driven vs inline) TBD.
+- **⏳ NEW PR #6 awaiting your review** — `feat(attesto-gate): reconcile Cart Mandate ↔ Payment Mandate` (amount/currency/
+  order-id agreement at the `completeOrder` seam; +11 bypass tests, 189 green; CI green; auto-review running). Built by
+  the parallel SDK thread.
+- **SDK follow-ups still open (buildable now):** stateless Cart Mandate transport; e2e issuance wiring (noted in PR #1).
 - **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
 - **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
   composition, so a deploy serves the thin-consumer demo. **Your call** (separate, reviewed).
