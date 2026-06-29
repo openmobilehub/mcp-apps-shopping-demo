@@ -55,11 +55,12 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
   Workflow." Auto-review: `CLAUDE_CODE_OAUTH_TOKEN` **is set** and PR #5's standard workflow is installed, so reviews
   run. The `CLAUDE_REVIEW_ENABLED` var is **not** set, so PR #2's *gated* workflow stays off — now redundant; consider
   deleting it to avoid double-reviews.
-- **🌐 Website thread — design APPROVED + spec + plan committed.** Spec `c44c4ee`, plan
-  `docs/superpowers/plans/2026-06-28-attesto-website.md` (`fcb51a3`). Animated hero "Watch the agent ask" (Treatment A),
-  single self-contained static page; lives in its **own repo `openmobilehub/attesto-website`** (GitHub Pages, decoupled
-  from npm). **Blocked on you:** create the empty `openmobilehub/attesto-website` repo → then I execute the 5-task plan
-  (productionize `index.html` → Pages workflow → PR). Execution mode (subagent-driven vs inline) TBD.
+- **🌐 Website thread — BUILT; PR open.** Repo `openmobilehub/attesto-website` created (public); plan executed inline:
+  baseline on `main` (`ba26094`), self-contained `index.html` (animated hero A, real links, `63ace43`), Pages workflow.
+  **[PR #1](https://github.com/openmobilehub/attesto-website/pull/1) open for your review.** **To ship:** review/merge →
+  enable **Settings → Pages → Source: GitHub Actions** (one-time) → deploys to `https://openmobilehub.github.io/attesto-website/`.
+  (Why its own *public* repo: the library `openmobilehub/attesto` is INTERNAL, so it can't serve public Pages.)
+  Spec `c44c4ee` · plan `fcb51a3`.
 - **⏳ NEW PR #6 awaiting your review** — `feat(attesto-gate): reconcile Cart Mandate ↔ Payment Mandate` (amount/currency/
   order-id agreement at the `completeOrder` seam; +11 bypass tests, 189 green; CI green; auto-review running). Built by
   the parallel SDK thread.
