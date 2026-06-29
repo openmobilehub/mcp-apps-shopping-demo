@@ -44,7 +44,10 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 - **Flip this demo to the published packages** — AFTER `0.1.0` is on npm: change `@openmobilehub/attesto-*`
   from the workspace to `^0.1.x` and remove `packages/` here. (Until then the demo keeps building from the
   workspace.) Runbook: `docs/repo-migration-plan.md`.
-- **Cart Mandate (004) build** — spec ready (`specs/004-cart-mandate/spec.md`); after the migration settles.
+- **4 PRs awaiting your review on `openmobilehub/attesto`** (all CI-green): #1 Cart Mandate core (004),
+  #2 ROADMAP/LICENSE/deployment/gated-review, #3 standalone `completion.test.ts` (audit gap), #4 identity-first
+  non-commerce example. Merge what you like. (To enable the auto-review: add `CLAUDE_CODE_OAUTH_TOKEN` + set the
+  `CLAUDE_REVIEW_ENABLED` repo variable to `true`.)
 - **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
 - **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
   composition, so a deploy serves the thin-consumer demo. **Your call** (separate, reviewed).
