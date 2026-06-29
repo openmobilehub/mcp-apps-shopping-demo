@@ -25,13 +25,18 @@ Check a box (or tell me). Each carries my recommendation; full reasoning is in t
 - [ ] **D8 — Prod demo cutover deploy on `mcp-apps-nine`?** ✅ *Authorized 2026-06-28 ("go for it").* The committed
       entrypoint is the thin-consumer composition, but it's on `feat/attesto-gate-v0.1`, not `main` — so this likely
       needs a **merge to `main`** first (separately gated). Same Vercel-auth constraint as D6.
-- [ ] **D9 — Human-Not-Present (HNP): run the brainstorm?** Research + proposal ready (overnight) →
-      [`docs/superpowers/research/2026-06-29-human-not-present-scoping.md`](docs/superpowers/research/2026-06-29-human-not-present-scoping.md),
-      with a **13-item decision menu** (groups A–D). Lead recs: add an orthogonal **`presence` axis** to the honesty
-      model (a v0.1 HNP grant is *strictly weaker* than `presence-only-demo` — don't reuse that label); ship the
-      **smallest honest slice** = a single-origin server-HMAC `ap2.IntentMandate` routed through the unchanged
-      `completeOrder` seam, demo-fenced. HNP = the v0.2 user/agent-signed line 004 already deferred. **Next:** you skim
-      the doc → we run a fast brainstorm on the menu → spec → plan.
+- [ ] **D9 — Human-Not-Present (HNP): confirm the spec's baked-in decisions.** Overnight I produced the research
+      doc **and** a full speckit spec (you chose speckit for HNP). **Spec drafted + adversarially hardened:**
+      `specs/005-human-not-present/spec.md` (PR below). It encodes the research's 13 recommendations and was put
+      through a 4-lens review (read the real `attesto` code) that found **3 blockers + 9 majors + 7 minors — all
+      fixed**. Key calls needing your **confirm/override**: (2) HNP gets its OWN honesty values
+      (`presence: delegated-demo` + `trust_level: server-issued-demo`) — it is *strictly weaker* than the live
+      rails and a **bearer token** (subject not enforced, invariant 6 only partial); (3) server composes+signs the
+      bounds in v0.1; (10) `completeOrder` gains an additive **fail-closed** branch (the seam re-checks). **Next
+      sequence:** you confirm the decisions → **`/speckit-constitution`** MINOR amendment (Principles II/III/VII,
+      Decision 13) → **`/speckit-plan`** → tasks → implement. I deliberately did **not** run `/speckit-plan` — it
+      would hard-code the unconfirmed honesty model + run a constitution check against un-amended principles.
+      Research: [`…/2026-06-29-human-not-present-scoping.md`](docs/superpowers/research/2026-06-29-human-not-present-scoping.md).
 
 Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremony-extraction/tail-implementation-plan.md`
 
