@@ -39,8 +39,9 @@ so a builder and an evaluator each find their footing without a separate page.
   → for-developers → footer.
 - **Self-contained**: no external runtime dependencies, no CDN, no fonts/images fetched over the network,
   no analytics, no framework. Renders identically from `file://` with no network.
-- Deployed via **GitHub Pages** from a `site/` directory in `openmobilehub/attesto`, **decoupled from the
-  npm release** (the site can ship independently of `0.1.0`).
+- Lives in its **own repository** (`openmobilehub/attesto-website`), separate from the library
+  (`openmobilehub/attesto`), and is deployed via **GitHub Pages**, **decoupled from the npm release**
+  (the site can ship independently of `0.1.0`).
 
 **Out of scope (defer):**
 
@@ -126,17 +127,24 @@ source of truth. The website must never state a stronger guarantee than the SDK 
 - When the SDK earns **issuer-verified** trust (v0.2), the roadmap row flips — the site follows the SDK,
   not the reverse.
 
-This is the one place the website and SDK are intentionally coupled. Everything else is independent.
+This is the one place the website and SDK are intentionally coupled, and the site now lives in a
+**separate repo**, so the sync is by process, not co-location: the trust table **cites the SDK's
+canonical `docs/reference/trust-model.md`** (in `openmobilehub/attesto`), and a release-checklist line
+updates the table whenever `trust_level` changes. No build-time dependency between the repos. Everything
+else is fully independent.
 
 ## Architecture / build / deploy
 
 - **One page, hand-authored.** `site/index.html`, optionally with `site/styles.css` + `site/app.js`
   split out for maintainability — but **zero runtime dependencies, no framework, no bundler, no Tailwind.**
   A single page is the right size; YAGNI on tooling.
-- **Home:** a `site/` directory in `openmobilehub/attesto` (the library repo). The website is a separate
-  PR track from `packages/**`, so it never collides with SDK work.
-- **Deploy:** GitHub Pages serving `site/` (Pages-from-folder or a small Pages Action). **Decoupled from
-  the npm release** — shipping the site does not require `0.1.0` to be published, and vice versa.
+- **Home:** its **own repository** — `openmobilehub/attesto-website` (recommended name; `attesto-site` is
+  the alternative), separate from the library `openmobilehub/attesto`. The library repo stays focused on
+  `packages/**`; the site gets its own issues, PRs, CI, deploy cadence, and (later) a custom domain — and a
+  website redesign never touches the library's history or releases.
+- **Deploy:** GitHub Pages from the site repo (root `index.html`, Pages-from-`main`), custom domain
+  attachable later. **Decoupled from the npm release** — shipping the site does not require `0.1.0`, and
+  vice versa.
 
 ## Testing / validation
 
@@ -162,4 +170,6 @@ This is the one place the website and SDK are intentionally coupled. Everything 
   fit lower on the page.
 - **Hero:** Treatment A ("Watch the agent ask") — chosen for staging consent-before-action literally.
 - **Scope:** single static landing page; no framework/build tooling.
-- **Home + deploy:** `site/` in `openmobilehub/attesto`, GitHub Pages, decoupled from the npm release.
+- **Home + deploy:** a **separate repo** (`openmobilehub/attesto-website`), GitHub Pages, decoupled from
+  the npm release; the one SDK coupling (the trust table) stays honest by a documented sync rule that cites
+  the SDK's `docs/reference/trust-model.md`, not by a build dependency.
