@@ -161,7 +161,8 @@ clearance). These avoid the "Attesto" root and the same-space identity/security 
 | **Credence** | the *trust extended*; credential-cousin | Evocative; **check CredenceID (biometrics) collision** |
 | **Avowa** | from *avow* (declare/affirm) | "consent-first"; check Avoco (UK age-verification) nearness |
 
-(The above replace the earlier "rename fallback" list; full prior sweep is on file as `docs/naming-clearance.md`.)
+(These are search-signal candidates only — directional, not cleared. Any final pick needs the same counsel-run
+USPTO / EUIPO / TMview clearance as the primary name.)
 
 ---
 
