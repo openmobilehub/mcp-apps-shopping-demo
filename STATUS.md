@@ -25,6 +25,13 @@ Check a box (or tell me). Each carries my recommendation; full reasoning is in t
 - [ ] **D8 — Prod demo cutover deploy on `mcp-apps-nine`?** ✅ *Authorized 2026-06-28 ("go for it").* The committed
       entrypoint is the thin-consumer composition, but it's on `feat/attesto-gate-v0.1`, not `main` — so this likely
       needs a **merge to `main`** first (separately gated). Same Vercel-auth constraint as D6.
+- [ ] **D9 — Human-Not-Present (HNP): run the brainstorm?** Research + proposal ready (overnight) →
+      [`docs/superpowers/research/2026-06-29-human-not-present-scoping.md`](docs/superpowers/research/2026-06-29-human-not-present-scoping.md),
+      with a **13-item decision menu** (groups A–D). Lead recs: add an orthogonal **`presence` axis** to the honesty
+      model (a v0.1 HNP grant is *strictly weaker* than `presence-only-demo` — don't reuse that label); ship the
+      **smallest honest slice** = a single-origin server-HMAC `ap2.IntentMandate` routed through the unchanged
+      `completeOrder` seam, demo-fenced. HNP = the v0.2 user/agent-signed line 004 already deferred. **Next:** you skim
+      the doc → we run a fast brainstorm on the menu → spec → plan.
 
 Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremony-extraction/tail-implementation-plan.md`
 
@@ -48,9 +55,11 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
   docs + scaffolding in place). **Remaining (needs you, in the NEW repo):** (1) add the **`NPM_TOKEN`** secret;
   (2) **publish `0.1.0`** — cut a GitHub Release → `publish.yml` (gate then storefront); optional
   `CLAUDE_CODE_OAUTH_TOKEN` secret for the auto-review.
-- **▶ Flip this demo to the published packages — NOW UNBLOCKED** (`0.1.0` is on npm). Change `@openmobilehub/attesto-*`
-  from the workspace to `^0.1.x` and remove `packages/` here, keeping build + full suite green. Runbook:
-  `docs/repo-migration-plan.md`. (This is the migration's final step — the demo becomes a true npm consumer.)
+- **✅ Demo flip → published deps DONE — [PR #19](https://github.com/openmobilehub/mcp-apps-shopping-demo/pull/19) open.**
+  Demo now consumes `@openmobilehub/attesto-*@^0.1.0` (workspace + `packages/` removed; `vercel.json includeFiles`
+  repointed at `node_modules`). Build green; **62/62 tests** green against the published packages (incl. the
+  `storefront-gate` bypass test); a Vercel preview validates the runtime. Base `feat/attesto-gate-v0.1`. **Your move:**
+  review/merge. (Test count 216→62 because the package unit suites now live in `openmobilehub/attesto`.)
 - **✅ The 4 PRs are MERGED** into `openmobilehub/attesto` (#1 Cart Mandate core, #2 ROADMAP/LICENSE/deployment/
   gated-review, #3 standalone `completion.test.ts`, #4 identity-first example) — plus #5 "Add Claude Code GitHub
   Workflow." Auto-review: `CLAUDE_CODE_OAUTH_TOKEN` **is set** and PR #5's standard workflow is installed, so reviews
