@@ -2,6 +2,7 @@
 
 _Single source of truth for what's done, what's next, and what's waiting on you._
 _Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 216 pass / 0 skip (003 cutover done — demo is a thin consumer; the package suites are the source of truth)._
+_The 4 migration PRs are **merged** into `openmobilehub/attesto`; the website design is **approved** (spec committed). Critical path to GDC = publish `0.1.0` → flip demo._
 
 > **How this file works.** Claude keeps it current at the end of every working session (and
 > re-reads it at the start). You resolve a decision by checking its box (or just say "do D1–D3
@@ -16,8 +17,13 @@ Check a box (or tell me). Each carries my recommendation; full reasoning is in t
 
 - [ ] **D5 — Publish `0.1.0`?** Needs your `@openmobilehub` npm auth. Now sequenced to publish **from the new
       `openmobilehub/attesto` repo** (gate first, then storefront — it deps on the gate via `^0.1.0`).  → `docs/PUBLISHING.md`
-- [ ] **D6 — Redeploy the preview?** `attesto-storefront.vercel.app` is one deploy *behind* — it predates the
-      place-order security fix. Trivial to redeploy; I held off to honor "nothing outward-facing."
+- [ ] **D6 — Redeploy the preview?** ✅ *Authorized 2026-06-28 ("go for it").* `attesto-storefront.vercel.app` is
+      one deploy *behind* (predates the place-order security fix). **Execution pending:** the `vercel` CLI in the
+      assistant session is a plugin shim, not your authed CLI — needs you to run it (`! vercel …`) or drive the
+      Vercel integration with the swap→deploy→revert→re-alias + Redis recipe.
+- [ ] **D8 — Prod demo cutover deploy on `mcp-apps-nine`?** ✅ *Authorized 2026-06-28 ("go for it").* The committed
+      entrypoint is the thin-consumer composition, but it's on `feat/attesto-gate-v0.1`, not `main` — so this likely
+      needs a **merge to `main`** first (separately gated). Same Vercel-auth constraint as D6.
 
 Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremony-extraction/tail-implementation-plan.md`
 
@@ -30,7 +36,7 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
   blocks the roadmap. (Publishing is the real point-of-no-return — a pro trademark search is still advised before `0.1.0`.)
 - **Repo split → `openmobilehub/attesto`:** **re-sequenced — now the next priority**, and `0.1.0` publishes
   **FROM the new repo** (with dev + reference docs), not from here. **Cutoff (now met) + runbook:**
-  `docs/repo-migration-plan.md`. Open: confirm the optional ~2026-08-25 pre-GDC backstop.
+  `docs/repo-migration-plan.md`. **Pre-GDC backstop ~2026-08-25 confirmed** (2026-06-28).
 
 ---
 
@@ -44,10 +50,17 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 - **Flip this demo to the published packages** — AFTER `0.1.0` is on npm: change `@openmobilehub/attesto-*`
   from the workspace to `^0.1.x` and remove `packages/` here. (Until then the demo keeps building from the
   workspace.) Runbook: `docs/repo-migration-plan.md`.
-- **4 PRs awaiting your review on `openmobilehub/attesto`** (all CI-green): #1 Cart Mandate core (004),
-  #2 ROADMAP/LICENSE/deployment/gated-review, #3 standalone `completion.test.ts` (audit gap), #4 identity-first
-  non-commerce example. Merge what you like. (To enable the auto-review: add `CLAUDE_CODE_OAUTH_TOKEN` + set the
-  `CLAUDE_REVIEW_ENABLED` repo variable to `true`.)
+- **✅ The 4 PRs are MERGED** into `openmobilehub/attesto` (#1 Cart Mandate core, #2 ROADMAP/LICENSE/deployment/
+  gated-review, #3 standalone `completion.test.ts`, #4 identity-first example) — plus #5 "Add Claude Code GitHub
+  Workflow." Auto-review: `CLAUDE_CODE_OAUTH_TOKEN` **is set** and PR #5's standard workflow is installed, so reviews
+  run. The `CLAUDE_REVIEW_ENABLED` var is **not** set, so PR #2's *gated* workflow stays off — now redundant; consider
+  deleting it to avoid double-reviews.
+- **🌐 Website thread — design APPROVED, spec committed** (`docs/superpowers/specs/2026-06-28-attesto-website-design.md`,
+  `f25374b`). Animated hero "Watch the agent ask" (Treatment A) on a single static page; lives in `site/` of
+  `openmobilehub/attesto`, GitHub Pages, decoupled from the npm release. **Next:** user reviews the spec → writing-plans
+  → build `site/` → PR. Independent of `packages/**` — no collision with SDK work.
+- **SDK follow-up PRs (buildable now, parallel thread):** Cart Mandate ↔ PaymentMandate reconciliation; stateless
+  transport; e2e issuance wiring (all noted in PR #1).
 - **Preview redeploy** — **D6** (trivial; the live preview predates the place-order security fix).
 - **Prod demo cutover deploy** — `mcp-apps-nine` still runs the old build; the committed entrypoint is now the
   composition, so a deploy serves the thin-consumer demo. **Your call** (separate, reviewed).
@@ -58,6 +71,8 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 | What | Commit |
 | :-- | :-- |
+| **Website design approved + spec committed** — single static page, animated hero A; honesty mirrors SDK `trust_level` | `f25374b` |
+| **4 migration PRs merged** into `openmobilehub/attesto` (#1 Cart Mandate · #2 docs+ci · #3 completion.test · #4 example) + #5 Claude workflow; `CLAUDE_CODE_OAUTH_TOKEN` set | (attesto `main`) |
 | **Migration prep** — staged the `openmobilehub/attesto` repo (dev + reference docs, scaffolding, history-preserving migration script); docs verified accurate + honest | `docs/attesto/` |
 | **003 cutover COMPLETE** — demo is a thin consumer of the packages (factory → entrypoint flip → main.ts rewire → deleted 60 dead files → retired the demo widget); 216 tests green | `da21527`…`071df28` |
 | Security: closed the `place-order` gate bypass (invariant 1) + load-bearing test | `2a6ca24` |
