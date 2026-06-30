@@ -1,16 +1,16 @@
-// The shared composition factory — builds a fully-wired Attesto storefront Express app
+// The shared composition factory — builds a fully-wired AttestoMCP storefront Express app
 // from the two extracted packages, exactly as the quickstart shows (zero glue):
-//   createStorefront({...}) + new Attesto().mount(store.app) + store.gate(...)
+//   createStorefront({...}) + new AttestoMcp().mount(store.app) + store.gate(...)
 //
 // Both entrypoints use it: the preview (api/storefront.ts) and — at the 003 cutover —
 // the committed demo (api/index.ts), differing only by injected catalog + Redis
 // namespace. Redis-backed stores survive Vercel instance splits; settlement is the
 // injected Hedera/x402 seam. Without Redis env it falls back to in-memory (dev/test).
 import { Redis } from "@upstash/redis";
-import { createStorefront, type Storefront, type CompletedOrderRecord } from "@openmobilehub/attesto-storefront/server";
-import type { Order, Product, Review } from "@openmobilehub/attesto-storefront";
+import { createStorefront, type Storefront, type CompletedOrderRecord } from "@openmobilehub/attestomcp-storefront/server";
+import type { Order, Product, Review } from "@openmobilehub/attestomcp-storefront";
 import {
-  Attesto,
+  AttestoMcp,
   age,
   membership,
   payment,
@@ -20,7 +20,7 @@ import {
   type GateOrder,
   type VerificationRecord,
   type VerificationStore,
-} from "@openmobilehub/attesto-gate";
+} from "@openmobilehub/attestomcp-gate";
 import { settleOrder } from "../payment-gate/hedera-settlement/settle.js";
 import { hederaSettlementConfig, type HederaSettlementConfig } from "../payment-gate/hedera-settlement/config.js";
 
@@ -135,10 +135,10 @@ export function composeStorefront(opts: ComposeOptions): Storefront {
     ...(hedera ? { settle: makeSettle(hedera) } : {}),
   });
 
-  const attesto = new Attesto();
-  attesto.mount(store.app);
+  const attestoMcp = new AttestoMcp();
+  attestoMcp.mount(store.app);
   store.gate((order) =>
-    attesto.requirements(order, [
+    attestoMcp.requirements(order, [
       required(age.over(21).when(hasAlcohol)),
       optional(membership.discount(10)),
       required(payment.in("usd")),

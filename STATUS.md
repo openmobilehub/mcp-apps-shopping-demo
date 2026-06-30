@@ -1,8 +1,8 @@
-# Project Status — Attesto v0.1
+# Project Status — AttestoMCP v0.1
 
 _Single source of truth for what's done, what's next, and what's waiting on you._
 _Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 216 pass / 0 skip (003 cutover done — demo is a thin consumer; the package suites are the source of truth)._
-_The 4 migration PRs are **merged** into `openmobilehub/attesto`; the website design is **approved** (spec committed). Critical path to GDC = publish `0.1.0` → flip demo._
+_The 4 migration PRs are **merged** into `openmobilehub/attestomcp`; the website design is **approved** (spec committed). Critical path to GDC = publish `0.1.0` → flip demo._
 
 > **How this file works.** Claude keeps it current at the end of every working session (and
 > re-reads it at the start). You resolve a decision by checking its box (or just say "do D1–D3
@@ -15,8 +15,8 @@ _The 4 migration PRs are **merged** into `openmobilehub/attesto`; the website de
 
 Check a box (or tell me). Each carries my recommendation; full reasoning is in the linked plan.
 
-- [x] **D5 — Publish `0.1.0`? ✅ DONE 2026-06-29.** Both live on npm: `@openmobilehub/attesto-gate@0.1.0` +
-      `@openmobilehub/attesto-storefront@0.1.0` (public, no provenance — repo is INTERNAL, see PR #7). Published via a
+- [x] **D5 — Publish `0.1.0`? ✅ DONE 2026-06-29.** Both live on npm: `@openmobilehub/attestomcp-gate@0.1.0` +
+      `@openmobilehub/attestomcp-storefront@0.1.0` (public, no provenance — repo is INTERNAL, see PR #7). Published via a
       GitHub Release → `publish.yml`, using a **granular** npm token (classic publish tokens 403 on 2FA in CI).
 - [ ] **D6 — Redeploy the preview?** ✅ *Authorized 2026-06-28 ("go for it").* `attesto-storefront.vercel.app` is
       one deploy *behind* (predates the place-order security fix). **Execution pending:** the `vercel` CLI in the
@@ -35,7 +35,7 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 - **D0 — Name:** proceed as **Attesto** for now; a rename is a deferred, accepted-cost find-replace if we choose
   it (a cleared shortlist of alternatives is saved as reference — `docs/naming-clearance.md`). Naming no longer
   blocks the roadmap. (Publishing is the real point-of-no-return — a pro trademark search is still advised before `0.1.0`.)
-- **Repo split → `openmobilehub/attesto`:** **re-sequenced — now the next priority**, and `0.1.0` publishes
+- **Repo split → `openmobilehub/attestomcp`:** **re-sequenced — now the next priority**, and `0.1.0` publishes
   **FROM the new repo** (with dev + reference docs), not from here. **Cutoff (now met) + runbook:**
   `docs/repo-migration-plan.md`. **Pre-GDC backstop ~2026-08-25 confirmed** (2026-06-28).
 
@@ -43,15 +43,15 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ## 🔨 In flight / next
 
-- **✅ Repo migration → `openmobilehub/attesto` DONE.** The library is live at
-  https://github.com/openmobilehub/attesto (history-preserved, 95 commits; CI green; `main` branch-protected;
+- **✅ Repo migration → `openmobilehub/attestomcp` DONE.** The library is live at
+  https://github.com/openmobilehub/attestomcp (history-preserved, 95 commits; CI green; `main` branch-protected;
   docs + scaffolding in place). **Remaining (needs you, in the NEW repo):** (1) add the **`NPM_TOKEN`** secret;
   (2) **publish `0.1.0`** — cut a GitHub Release → `publish.yml` (gate then storefront); optional
   `CLAUDE_CODE_OAUTH_TOKEN` secret for the auto-review.
-- **▶ Flip this demo to the published packages — NOW UNBLOCKED** (`0.1.0` is on npm). Change `@openmobilehub/attesto-*`
+- **▶ Flip this demo to the published packages — NOW UNBLOCKED** (`0.1.0` is on npm). Change `@openmobilehub/attestomcp-*`
   from the workspace to `^0.1.x` and remove `packages/` here, keeping build + full suite green. Runbook:
   `docs/repo-migration-plan.md`. (This is the migration's final step — the demo becomes a true npm consumer.)
-- **✅ The 4 PRs are MERGED** into `openmobilehub/attesto` (#1 Cart Mandate core, #2 ROADMAP/LICENSE/deployment/
+- **✅ The 4 PRs are MERGED** into `openmobilehub/attestomcp` (#1 Cart Mandate core, #2 ROADMAP/LICENSE/deployment/
   gated-review, #3 standalone `completion.test.ts`, #4 identity-first example) — plus #5 "Add Claude Code GitHub
   Workflow." Auto-review: `CLAUDE_CODE_OAUTH_TOKEN` **is set** and PR #5's standard workflow is installed, so reviews
   run. The `CLAUDE_REVIEW_ENABLED` var is **not** set, so PR #2's *gated* workflow stays off — now redundant; consider
@@ -60,7 +60,7 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
   `openmobilehub/attesto-website` (public); PR #1 merged to `main`; Pages enabled (GitHub Actions source); deploy
   succeeded on merge. Single self-contained `index.html` — animated hero A, real links, honesty table mirrors the SDK
   trust model. Future site edits = PR to `main` → auto-deploys. Spec `c44c4ee` · plan `fcb51a3`.
-  (Its own *public* repo because the library `openmobilehub/attesto` is INTERNAL and can't serve public Pages.)
+  (Its own *public* repo because the library `openmobilehub/attestomcp` is INTERNAL and can't serve public Pages.)
 - **⏳ NEW PR #6 awaiting your review** — `feat(attesto-gate): reconcile Cart Mandate ↔ Payment Mandate` (amount/currency/
   order-id agreement at the `completeOrder` seam; +11 bypass tests, 189 green; CI green; auto-review running). Built by
   the parallel SDK thread.
@@ -75,11 +75,11 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 | What | Commit |
 | :-- | :-- |
-| **`0.1.0` PUBLISHED to npm** — gate + storefront live, public (provenance dropped for internal repo via attesto PR #7); granular token | npm `@openmobilehub/attesto-*@0.1.0` |
+| **`0.1.0` PUBLISHED to npm** — gate + storefront live, public (provenance dropped for internal repo via attestomcp PR #7); granular token | npm `@openmobilehub/attestomcp-*@0.1.0` |
 | **Website LIVE** — own public repo `openmobilehub/attesto-website`, GitHub Pages (animated hero A); design spec synced into the site repo | `attesto-website` |
 | **Website design approved + spec committed** — single static page, animated hero A; honesty mirrors SDK `trust_level` | `f25374b` |
-| **4 migration PRs merged** into `openmobilehub/attesto` (#1 Cart Mandate · #2 docs+ci · #3 completion.test · #4 example) + #5 Claude workflow; `CLAUDE_CODE_OAUTH_TOKEN` set | (attesto `main`) |
-| **Migration prep** — staged the `openmobilehub/attesto` repo (dev + reference docs, scaffolding, history-preserving migration script); docs verified accurate + honest | `docs/attesto/` |
+| **4 migration PRs merged** into `openmobilehub/attestomcp` (#1 Cart Mandate · #2 docs+ci · #3 completion.test · #4 example) + #5 Claude workflow; `CLAUDE_CODE_OAUTH_TOKEN` set | (attestomcp `main`) |
+| **Migration prep** — staged the `openmobilehub/attestomcp` repo (dev + reference docs, scaffolding, history-preserving migration script); docs verified accurate + honest | `docs/attesto/` |
 | **003 cutover COMPLETE** — demo is a thin consumer of the packages (factory → entrypoint flip → main.ts rewire → deleted 60 dead files → retired the demo widget); 216 tests green | `da21527`…`071df28` |
 | Security: closed the `place-order` gate bypass (invariant 1) + load-bearing test | `2a6ca24` |
 | 003 tail: decision-ready implementation plan | `649cd0e` |
