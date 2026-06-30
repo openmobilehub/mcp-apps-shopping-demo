@@ -3,7 +3,7 @@ import { buildDemoApp } from "./demo-app.js";
 
 async function startStdioServer(): Promise<void> {
   // stdio mode has no HTTP server of its own, but openLink needs a URL to open. Serve
-  // the FULL composed app (checkout page + the mounted /attesto/* ceremony + order
+  // the FULL composed app (checkout page + the mounted /attestomcp/* ceremony + order
   // status) in the same process so every link the widget opens resolves and shares
   // cart/order/verification state with the stdio MCP server.
   const port = Number(process.env.CHECKOUT_PORT ?? 3030);

@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{dist/**,packages/attesto-storefront/dist/**,packages/attesto-gate/dist/**,node_modules/@simplewebauthn/browser/**}",
+      "includeFiles": "{dist/**,node_modules/@openmobilehub/attestomcp-storefront/dist/**,node_modules/@openmobilehub/attestomcp-gate/dist/**,node_modules/@simplewebauthn/browser/**}",
       "maxDuration": 60
     }
   },

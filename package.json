@@ -4,17 +4,13 @@
   "type": "module",
   "private": true,
   "description": "MCP App for Claude Desktop: interactive multi-product selector",
-  "workspaces": [
-    "packages/*"
-  ],
   "bin": {
     "product-picker": "dist/main.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build:server": "tsc -p tsconfig.server.json",
-    "build:packages": "npm run build --workspaces --if-present",
-    "build": "npm run build:packages && npm run typecheck && npm run build:server",
+    "build": "npm run typecheck && npm run build:server",
     "start:stdio": "node dist/main.js --stdio",
     "start:http": "node dist/main.js",
     "test": "vitest run",
@@ -25,6 +21,8 @@
     "@hpke/core": "^1.9.0",
     "@modelcontextprotocol/ext-apps": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openmobilehub/attestomcp-gate": "^0.1.0",
+    "@openmobilehub/attestomcp-storefront": "^0.1.0",
     "@peculiar/x509": "^1.14.3",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",

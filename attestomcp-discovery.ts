@@ -1,5 +1,5 @@
 // Agent-native discovery for the consent layer. Two surfaces:
-//   GET /.well-known/attesto.json  — a capability manifest an agent reads to learn
+//   GET /.well-known/attestomcp.json  — a capability manifest an agent reads to learn
 //     the gate's shape (credential kinds, the refusal contract, the resume protocol)
 //     BEFORE it ever hits a refusal.
 //   GET /llms.txt — an integration guide a calling/build-time agent reads to drive
@@ -7,10 +7,10 @@
 // Both describe the LIVE runtime behavior, and both are honest about what binds
 // cryptographically today vs. what's still a flow demo.
 
-export const ATTESTO_PROTOCOL_VERSION = "attesto.verification/v1";
+export const ATTESTOMCP_PROTOCOL_VERSION = "attestomcp.verification/v1";
 
-export interface AttestoManifest {
-  attesto: string;
+export interface AttestoMcpManifest {
+  attestomcp: string;
   summary: string;
   refusal_contract: string;
   refusal_sentinel: string;
@@ -27,14 +27,14 @@ export interface AttestoManifest {
   live: string;
 }
 
-export function attestoManifest(baseUrl: string): AttestoManifest {
+export function attestoMcpManifest(baseUrl: string): AttestoMcpManifest {
   return {
-    attesto: "1.0",
+    attestomcp: "1.0",
     summary:
       "Money moves only after the buyer proves a credential from their phone wallet. " +
       "Identity leads; payments is one application.",
-    refusal_contract: ATTESTO_PROTOCOL_VERSION,
-    refusal_sentinel: "_attesto == 'verification_required'",
+    refusal_contract: ATTESTOMCP_PROTOCOL_VERSION,
+    refusal_sentinel: "_attestomcp == 'verification_required'",
     credentials: [
       {
         kind: "age",
@@ -67,9 +67,9 @@ export function attestoManifest(baseUrl: string): AttestoManifest {
   };
 }
 
-export const LLMS_TXT = `# Attesto — agent integration guide (llms.txt)
+export const LLMS_TXT = `# AttestoMCP — agent integration guide (llms.txt)
 
-Attesto is the consent layer for AI agents: a consequential MCP tool completes only
+AttestoMCP is the consent layer for AI agents: a consequential MCP tool completes only
 after the buyer proves a verifiable credential from their phone wallet. Identity
 leads; payments is one application.
 
@@ -87,7 +87,7 @@ not by withholding the link.
 
 ## Page-less gated tools (Mode B)
 A gated tool with no checkout page instead returns a \`verification_required\` envelope
-(\`structuredContent._attesto == "verification_required"\`) — NOT an error. Drive it the same
+(\`structuredContent._attestomcp == "verification_required"\`) — NOT an error. Drive it the same
 way: surface \`present.approve_url\`, say which credential and why, do not claim the order is
 placed, then poll \`resume.tool\` (\`get-order-status\`).
 
@@ -101,5 +101,5 @@ placed, then poll \`resume.tool\` (\`get-order-status\`).
   safety control. A real deployment adds trust anchors (Multipaz / @auth0/mdl).
 - The payment mandate is AP2-shaped and dev-signed (integrity hash), not key-signed.
 
-Capability manifest: /.well-known/attesto.json
+Capability manifest: /.well-known/attestomcp.json
 `;

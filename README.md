@@ -1,4 +1,4 @@
-# Attesto — the consent layer for AI agents
+# AttestoMCP — the consent layer for AI agents
 
 **An [Open Mobile Hub](https://openmobilehub.org) project (Linux Foundation).** An AI agent must prove a
 verifiable credential from the user's phone wallet before a consequential MCP tool completes.
@@ -46,20 +46,20 @@ verifiable credential from the user's phone wallet before a consequential MCP to
 
 Use either alone, or compose them (which is what this demo is).
 
-### The Gate — `@openmobilehub/attesto-gate`
+### The Gate — `@openmobilehub/attestomcp-gate`
 
 Configure once, then resolve a credential **policy** to a serializable manifest. Today's MCP `checkout`
 tool consumes it:
 
 ```ts
-import { Attesto, age, membership, payment, required, optional } from "@openmobilehub/attesto-gate";
+import { AttestoMcp, age, membership, payment, required, optional } from "@openmobilehub/attestomcp-gate";
 
-const attesto = new Attesto();   // zero-config (defaults to http://localhost:3000)
-// for a deployment, pass your public origin: new Attesto({ walletOrigin: "https://shop.example" })
-attesto.mount(app);   // wires the real /attesto/* ceremony rails (passkey + dc-payment + credential gate)
+const attestoMcp = new AttestoMcp();   // zero-config (defaults to http://localhost:3000)
+// for a deployment, pass your public origin: new AttestoMcp({ walletOrigin: "https://shop.example" })
+attestoMcp.mount(app);   // wires the real /attestomcp/* ceremony rails (passkey + dc-payment + credential gate)
 
 // In your checkout tool handler — resolve the policy against the server-priced order:
-const requires = attesto.requirements(order, [
+const requires = attestoMcp.requirements(order, [
   required(age.over(21).when(hasAlcohol)),   // 21+ — only when the cart has alcohol
   optional(membership.discount(10)),          // 10% off if a loyalty credential is presented
   required(payment.in("usd")),                // amount derived from the order; settles last
@@ -71,13 +71,13 @@ return { structuredContent: { orderId: order.id, checkoutUrl, requires }, conten
 flat, JSON-safe manifest (no functions cross the wire). The checkout tool **mints the link and surfaces
 `requires`** (consolidated Mode A); the page runs the gates and the completion path enforces. A page-less
 tool can instead block and return the `verification_required` envelope (Mode B — `gated()`). See
-[`packages/attesto-gate/README.md`](packages/attesto-gate/README.md) and the runnable
+[`packages/attestomcp-gate/README.md`](packages/attestomcp-gate/README.md) and the runnable
 [quickstart](specs/001-attesto-sdk/quickstart.md).
 
-### The Storefront — `@openmobilehub/attesto-storefront`
+### The Storefront — `@openmobilehub/attestomcp-storefront`
 
 The catalog-injected cart/pricing/order model an MCP shopping app needs (own-the-code). See
-[`packages/attesto-storefront/README.md`](packages/attesto-storefront/README.md).
+[`packages/attestomcp-storefront/README.md`](packages/attestomcp-storefront/README.md).
 
 ## Try it in 2 minutes
 
@@ -107,11 +107,11 @@ the Claude Code terminal. The reusable SDK is being **extracted** from it. We're
 
 | | Real, runs today | Status |
 | :-- | :-- | :-- |
-| **The age gate, surfaced + enforced** | An age-restricted cart returns a checkout link **plus** a `requires` manifest (age 21+); the gate is enforced on the completion path (`place-order` → 403, with bypass tests) | ✅ `@openmobilehub/attesto-gate` v0.1 |
+| **The age gate, surfaced + enforced** | An age-restricted cart returns a checkout link **plus** a `requires` manifest (age 21+); the gate is enforced on the completion path (`place-order` → 403, with bypass tests) | ✅ `@openmobilehub/attestomcp-gate` v0.1 |
 | **Fail-closed mdoc verifier** | OpenID4VP + ISO 18013-5 mDL; requires an explicit `age_over_21 === true` (not token-presence); refuses 18+ for a 21+ gate; nonce-bound | ✅ |
 | **x402 → Hedera settlement** | `npm run lab:settle` settles one real order and prints a HashScan tx | ✅ |
-| **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attesto-storefront` v0.1 (slice) |
-| **Agent-native discovery** | `/.well-known/attesto.json` + `/llms.txt` | ✅ |
+| **Storefront pricing model** | catalog-injected cart/order pricing | ✅ `@openmobilehub/attestomcp-storefront` v0.1 (slice) |
+| **Agent-native discovery** | `/.well-known/attestomcp.json` + `/llms.txt` | ✅ |
 | **mdoc *trust* (issuer/device signatures)** | decode is presence-only — a flow demo, **not a safety control** yet | 🔭 roadmap (Multipaz / `@auth0/mdl`) |
 | **Key-signed AP2 mandate; custom credentials; arbitrary discounts** | — | 🔭 roadmap |
 
@@ -173,13 +173,13 @@ npm run build        # builds the packages, then bundles the UI + compiles the s
 npm test             # unit tests
 ```
 
-`npm run build` runs `build:packages` (the `@openmobilehub/attesto-*` workspaces) first, then the app's
+`npm run build` runs `build:packages` (the `@openmobilehub/attestomcp-*` workspaces) first, then the app's
 typecheck / UI bundle / server compile.
 
 **Claude Desktop (stdio):** add to `claude_desktop_config.json`:
 
 ```json
-{ "mcpServers": { "attesto": { "command": "node", "args": ["/ABSOLUTE/PATH/dist/main.js", "--stdio"] } } }
+{ "mcpServers": { "attestomcp": { "command": "node", "args": ["/ABSOLUTE/PATH/dist/main.js", "--stdio"] } } }
 ```
 
 The mock checkout page is served on port `3030` (override `CHECKOUT_PORT`); in stdio mode it shares the
@@ -202,15 +202,15 @@ for the wallet-free buttons, and the `HEDERA_*` vars for settlement.
 
 ## Project layout
 
-- `packages/attesto-gate/` — **the Gate**: the `Attesto` client + `requirements()` (the code→data
+- `packages/attestomcp-gate/` — **the Gate**: the `AttestoMcp` client + `requirements()` (the code→data
   boundary), the credential builders (`age` / `membership` / `payment` + `defineCredential`), and the
   `verification_required` envelope (Mode-B / page-less). The app consumes it.
-- `packages/attesto-storefront/` — **the Storefront** (slice): catalog-injected `priceCart` / `createOrder`.
+- `packages/attestomcp-storefront/` — **the Storefront** (slice): catalog-injected `priceCart` / `createOrder`.
 - `server.ts` — MCP server + the 9 shopping tools (`browse-products`, `add-to-cart`, …, `checkout`,
   `get-order-status`). `checkout` surfaces a `requires` manifest beside the link.
 - `checkout.ts` — stateless orders + the mock checkout page; `createOrderForCheckout` / `checkoutUrlForOrder`.
 - `app.ts` / `main.ts` / `api/index.ts` — Express app (`/mcp` + `/checkout` + discovery), entrypoints, Vercel.
-- `attesto-discovery.ts` — `/.well-known/attesto.json` + `/llms.txt`.
+- `attestomcp-discovery.ts` — `/.well-known/attestomcp.json` + `/llms.txt`.
 - `catalog.ts` — sample products + pricing helpers. `cartStore.ts` / `orderStore.ts` / `verificationStore.ts` — state.
 - `payment-gate/` — credential gate (OpenID4VP/mdoc), passkey & DC-payment gates, AP2 mandate, x402/Hedera settlement.
 - `src/app.tsx` / `mcp-app.html` — the single-file React widget (runtime host detection: Claude / ChatGPT / standalone).

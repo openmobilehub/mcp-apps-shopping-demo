@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { attestoManifest, LLMS_TXT, ATTESTO_PROTOCOL_VERSION } from "./attesto-discovery.js";
+import { attestoMcpManifest, LLMS_TXT, ATTESTOMCP_PROTOCOL_VERSION } from "./attestomcp-discovery.js";
 
-describe("attesto capability manifest", () => {
+describe("attestomcp capability manifest", () => {
   it("declares the refusal contract, age enforcement, and an honest trust level", () => {
-    const m = attestoManifest("https://shop.example/");
-    expect(m.refusal_contract).toBe(ATTESTO_PROTOCOL_VERSION);
+    const m = attestoMcpManifest("https://shop.example/");
+    expect(m.refusal_contract).toBe(ATTESTOMCP_PROTOCOL_VERSION);
     expect(m.refusal_sentinel).toContain("verification_required");
 
     const age = m.credentials.find((c) => c.kind === "age")!;
@@ -17,7 +17,7 @@ describe("attesto capability manifest", () => {
   });
 
   it("is honest that mdoc trust is not verified yet", () => {
-    expect(attestoManifest("https://x").honest_status.toLowerCase()).toContain("not verified");
+    expect(attestoMcpManifest("https://x").honest_status.toLowerCase()).toContain("not verified");
   });
 });
 
