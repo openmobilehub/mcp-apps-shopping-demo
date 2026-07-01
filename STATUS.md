@@ -1,7 +1,7 @@
 # Project Status — AttestoMCP v0.1
 
 _Single source of truth for what's done, what's next, and what's waiting on you._
-_Updated **2026-06-28** · branch `feat/attesto-gate-v0.1` · build green · 216 pass / 0 skip (003 cutover done — demo is a thin consumer; the package suites are the source of truth)._
+_Updated **2026-07-01** · branch `feat/catalog-firestore-on-attestomcp` (off `feat/attesto-gate-v0.1`) · build green · demo suite 85 pass / 0 skip (catalog Firestore+static work; the package suites remain the source of truth)._
 _The 4 migration PRs are **merged** into `openmobilehub/attestomcp`; the website design is **approved** (spec committed). Critical path to GDC = publish `0.1.0` → flip demo._
 
 > **How this file works.** Claude keeps it current at the end of every working session (and
@@ -43,6 +43,15 @@ Plan with full reasoning, sequencing, test-impact + risk: `specs/003-gate-ceremo
 
 ## 🔨 In flight / next
 
+- **▶ Catalog: Firestore + static modes (branch `feat/catalog-firestore-on-attestomcp`).** Ports the
+  Firestore-backed catalog (from `feat/move_catalog_to_firestore`, the old PR #17) onto the attestomcp
+  baseline as a **port, not a merge**, and reworks it to the maintainer's review ask: two modes chosen at
+  startup via `CATALOG_SOURCE=static|firestore` (default `static` when no Firebase creds), logged as
+  `catalog source: …`. `catalog-seed.ts` (`SEED_PRODUCTS`) is the single source of truth for both the
+  Firestore seed and the static loader. Static = phone-free local dev / CI / DEMO_MODE; Firestore = edit
+  without redeploy, fails closed on empty/unreachable. Build green, 85/85 tests; verified as a live custom
+  connector over a tunnel (`scripts/start-tunnel.sh`). **Next:** close old PR #17, open a new PR from this
+  branch onto the attestomcp baseline.
 - **✅ Repo migration → `openmobilehub/attestomcp` DONE.** The library is live at
   https://github.com/openmobilehub/attestomcp (history-preserved, 95 commits; CI green; `main` branch-protected;
   docs + scaffolding in place). **Remaining (needs you, in the NEW repo):** (1) add the **`NPM_TOKEN`** secret;

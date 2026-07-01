@@ -8,7 +8,7 @@ async function startStdioServer(): Promise<void> {
   // cart/order/verification state with the stdio MCP server.
   const port = Number(process.env.CHECKOUT_PORT ?? 3030);
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? `http://localhost:${port}`;
-  const store = buildDemoApp(publicBaseUrl);
+  const store = await buildDemoApp(publicBaseUrl);
   store.app.listen(port, () => {
     console.error(`Checkout + gates on ${publicBaseUrl}`);
   });
@@ -18,7 +18,7 @@ async function startStdioServer(): Promise<void> {
 async function startHttpServer(): Promise<void> {
   const port = parseInt(process.env.PORT ?? "3001", 10);
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? `http://localhost:${port}`;
-  const store = buildDemoApp(publicBaseUrl);
+  const store = await buildDemoApp(publicBaseUrl);
 
   const httpServer = store.app.listen(port, () => {
     console.error(`MCP server listening on http://localhost:${port}/mcp`);

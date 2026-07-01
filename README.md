@@ -194,6 +194,40 @@ it and runs `npm run build`. Provision Upstash Redis (`vercel install upstash`) 
 `vercel deploy --prod`. The checkout link falls back to `VERCEL_PROJECT_PRODUCTION_URL`. Set `DEMO_MODE=1`
 for the wallet-free buttons, and the `HEDERA_*` vars for settlement.
 
+**Catalog source (`CATALOG_SOURCE`):** the catalog has two modes, chosen at startup and logged
+(`catalog source: static|firestore`):
+
+- **`static`** (default with no Firebase creds) — serves the code-reviewed `SEED_PRODUCTS`. Zero setup,
+  never throws; this is the path for local dev, CI, and the `DEMO_MODE` walkthrough.
+- **`firestore`** — loads the catalog server-side via the Firebase Admin SDK (5-minute TTL cache), so you
+  can edit products without a redeploy. Fails closed on an unreachable/empty cold load rather than serving
+  an empty catalog. Set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`
+  (newlines escaped as `\n`) — or point `GOOGLE_APPLICATION_CREDENTIALS` at a service-account JSON key.
+
+Selection is **explicit with a sane default**: `CATALOG_SOURCE=static|firestore` wins; otherwise it's
+`firestore` when creds are present, else `static`. Setting it explicitly avoids silently dropping to static
+when, say, `FIREBASE_PRIVATE_KEY` is missing. Pricing and age thresholds are re-derived server-side in both
+modes.
+
+For Firestore, deploy the rules once with `firebase deploy --only firestore:rules` (or paste
+`firestore.rules` into the Firebase console — public read, no client writes), then seed the same
+`SEED_PRODUCTS` with `GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json npm run seed:catalog`.
+Service-account keys are gitignored — never commit them.
+
+**Test locally as a custom connector:** `scripts/start-tunnel.sh` is the one-command way to get a public
+`/mcp` URL for your current working tree — it builds (clean), opens a [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+tunnel, and prints the ready-to-paste URL for **Claude → Settings → Connectors → Add custom connector**:
+
+```bash
+scripts/start-tunnel.sh          # static catalog (default, zero setup)
+
+# or point it at Firestore:
+CATALOG_SOURCE=firestore GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json scripts/start-tunnel.sh
+```
+
+Override `PORT` (default 3001) if needed; Ctrl-C stops both the server and the tunnel. `trycloudflare.com`
+URLs are ephemeral (a fresh one each run).
+
 > All hosted/tunnel setups are **authless** demo connectors — fine for a demo, not production. The cart
 > is demo-global and resets on redeploys; orders are stateless (encoded into the checkout link).
 

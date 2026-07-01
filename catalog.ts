@@ -59,124 +59,10 @@ export interface PriceOpts {
   loyaltyApplied?: boolean;
 }
 
-export const CATALOG: Product[] = [
-  {
-    id: "aurora-headphones",
-    name: "Aurora Wireless Headphones",
-    price: 199.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/aurora-headphones/400/300",
-    category: "Audio",
-    description: "Over-ear ANC headphones with 40h battery life.",
-  },
-  {
-    id: "nimbus-keyboard",
-    name: "Nimbus Mechanical Keyboard",
-    price: 129.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/nimbus-keyboard/400/300",
-    category: "Accessories",
-    description: "Hot-swappable 75% keyboard with PBT keycaps.",
-  },
-  {
-    id: "lumen-monitor",
-    name: 'Lumen 27" 4K Monitor',
-    price: 449.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/lumen-monitor/400/300",
-    category: "Displays",
-    description: "27-inch 4K IPS display with USB-C power delivery.",
-  },
-  {
-    id: "drift-mouse",
-    name: "Drift Ergonomic Mouse",
-    price: 69.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/drift-mouse/400/300",
-    category: "Accessories",
-    description: "Lightweight wireless mouse with silent clicks.",
-  },
-  {
-    id: "pulse-webcam",
-    name: "Pulse 1080p Webcam",
-    price: 89.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/pulse-webcam/400/300",
-    category: "Video",
-    description: "1080p60 webcam with auto light correction.",
-  },
-  {
-    id: "harbor-dock",
-    name: "Harbor USB-C Dock",
-    price: 159.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/harbor-dock/400/300",
-    category: "Accessories",
-    description: "11-in-1 dock: dual HDMI, Ethernet, SD, 100W passthrough.",
-  },
-  {
-    id: "ember-desk-lamp",
-    name: "Ember Smart Desk Lamp",
-    price: 59.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/ember-desk-lamp/400/300",
-    category: "Lighting",
-    description: "Tunable white LED lamp with wireless charging base.",
-  },
-  {
-    id: "atlas-stand",
-    name: "Atlas Laptop Stand",
-    price: 49.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/atlas-stand/400/300",
-    category: "Accessories",
-    description: "Aluminum adjustable laptop stand, folds flat.",
-  },
-  {
-    id: "celebration-champagne",
-    name: "Celebration Champagne Gift Set",
-    price: 89.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/celebration-champagne/400/300",
-    category: "Beverages",
-    description: "Brut champagne duo with two crystal flutes. 21+ only.",
-    minimumAge: 21,
-  },
-  {
-    id: "oak-whiskey",
-    name: "Oak Reserve Whiskey Collection",
-    price: 124.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/oak-whiskey/400/300",
-    category: "Beverages",
-    description: "Trio of small-batch aged whiskeys. 21+ only.",
-    minimumAge: 21,
-  },
-  {
-    id: "craft-beer-sampler",
-    name: "Craft Beer Sampler",
-    price: 48.0,
-    currency: "USD",
-    image: "https://picsum.photos/seed/craft-beer-sampler/400/300",
-    category: "Beverages",
-    description: "Twelve-can sampler of regional craft brews. 21+ only.",
-    minimumAge: 21,
-  },
-];
-
-export function getProduct(productId: string): Product | undefined {
-  return CATALOG.find((p) => p.id === productId);
-}
-
-
-export function requiredAgeForLines(lines: { id: string }[]): number | null {
-  let max: number | null = null;
-  for (const { id } of lines) {
-    const m = getProduct(id)?.minimumAge;
-    if (m != null && (max === null || m > max)) max = m;
-  }
-  return max;
-}
+// NOTE: the product data lives in catalog-seed.ts (SEED_PRODUCTS) — the shared
+// source of truth for both the Firestore seed and the static loader. Product
+// lookup + age-threshold derivation live in catalog-store.ts (getProduct /
+// requiredAgeForLines), which read the loaded catalog.
 
 export interface Review {
   author: string;
@@ -238,8 +124,8 @@ export function getReviews(productId: string): Review[] {
   return REVIEWS[productId] ?? [];
 }
 
-export function priceCart(items: CartItemInput[], opts: PriceOpts = {}): PricedCart {
-  const byId = new Map(CATALOG.map((p) => [p.id, p]));
+export function priceCart(items: CartItemInput[], catalog: Product[], opts: PriceOpts = {}): PricedCart {
+  const byId = new Map(catalog.map((p) => [p.id, p]));
   const lines: PricedCartLine[] = [];
   const unknownIds: string[] = [];
   let hasAgeRestricted = false;
@@ -298,7 +184,7 @@ export interface Order {
 
 // Snapshots cart items into an order. Unknown product ids are dropped (not
 // validated).
-export function createOrder(items: CartItemInput[], id: string, opts: PriceOpts = {}): Order {
-  const { lines, itemCount, subtotal, discount, total, currency } = priceCart(items, opts);
+export function createOrder(items: CartItemInput[], id: string, catalog: Product[], opts: PriceOpts = {}): Order {
+  const { lines, itemCount, subtotal, discount, total, currency } = priceCart(items, catalog, opts);
   return { id, lines, itemCount, subtotal, discount, total, currency, createdAt: new Date().toISOString() };
 }
