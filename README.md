@@ -214,6 +214,20 @@ For Firestore, deploy the rules once with `firebase deploy --only firestore:rule
 `SEED_PRODUCTS` with `GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json npm run seed:catalog`.
 Service-account keys are gitignored — never commit them.
 
+**Test locally as a custom connector:** `scripts/start-tunnel.sh` is the one-command way to get a public
+`/mcp` URL for your current working tree — it builds (clean), opens a [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+tunnel, and prints the ready-to-paste URL for **Claude → Settings → Connectors → Add custom connector**:
+
+```bash
+scripts/start-tunnel.sh          # static catalog (default, zero setup)
+
+# or point it at Firestore:
+CATALOG_SOURCE=firestore GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json scripts/start-tunnel.sh
+```
+
+Override `PORT` (default 3001) if needed; Ctrl-C stops both the server and the tunnel. `trycloudflare.com`
+URLs are ephemeral (a fresh one each run).
+
 > All hosted/tunnel setups are **authless** demo connectors — fine for a demo, not production. The cart
 > is demo-global and resets on redeploys; orders are stateless (encoded into the checkout link).
 
