@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { PrivateKey } from "@hashgraph/sdk";
 import { createOrder } from "../../catalog.js";
+import { SEED_PRODUCTS } from "../../catalog-seed.js";
 import type { HederaSettlementConfig } from "./config.js";
 import { settleOrder } from "./settle.js";
 
@@ -26,7 +27,7 @@ function deps(overrides: Partial<Parameters<typeof settleOrder>[2]> = {}) {
 
 function order(total = 42) {
   // drift-mouse exists in the catalog; the id is what matters here.
-  const o = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-SETTLE1");
+  const o = createOrder([{ productId: "drift-mouse", quantity: 1 }], "ORD-SETTLE1", SEED_PRODUCTS);
   return { ...o, total, lines: o.lines };
 }
 

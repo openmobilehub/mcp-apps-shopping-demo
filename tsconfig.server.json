@@ -11,5 +11,5 @@
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
-  "include": ["main.ts", "catalog.ts", "orderStore.ts", "demo-app.ts", "api/index.ts", "api/storefront.ts", "api/compose-storefront.ts", "payment-gate/hedera-settlement/lab.ts"]
+  "include": ["main.ts", "catalog.ts", "catalog-seed.ts", "catalog-source.ts", "catalog-store.ts", "firebase-admin.ts", "orderStore.ts", "demo-app.ts", "api/index.ts", "api/storefront.ts", "api/compose-storefront.ts", "payment-gate/hedera-settlement/lab.ts", "scripts/seed-catalog.ts"]
 }
