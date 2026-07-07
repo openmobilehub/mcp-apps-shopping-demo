@@ -1,6 +1,6 @@
 // The shared composition factory — builds a fully-wired AttestoMCP storefront Express app
 // from the two extracted packages, exactly as the quickstart shows (zero glue):
-//   createStorefront({...}) + new AttestoMcp().mount(store.app) + store.gate(...)
+//   createStorefront({...}) + new AttestoMCP().mount(store.app) + store.gate(...)
 //
 // Both entrypoints use it: the preview (api/storefront.ts) and — at the 003 cutover —
 // the committed demo (api/index.ts), differing only by injected catalog + Redis
@@ -10,7 +10,7 @@ import { Redis } from "@upstash/redis";
 import { createStorefront, type Storefront, type CompletedOrderRecord } from "@openmobilehub/attestomcp-storefront/server";
 import type { Order, Product, Review } from "@openmobilehub/attestomcp-storefront";
 import {
-  AttestoMcp,
+  AttestoMCP,
   age,
   membership,
   payment,
@@ -135,7 +135,7 @@ export function composeStorefront(opts: ComposeOptions): Storefront {
     ...(hedera ? { settle: makeSettle(hedera) } : {}),
   });
 
-  const attestoMcp = new AttestoMcp();
+  const attestoMcp = new AttestoMCP();
   attestoMcp.mount(store.app);
   store.gate((order) =>
     attestoMcp.requirements(order, [
