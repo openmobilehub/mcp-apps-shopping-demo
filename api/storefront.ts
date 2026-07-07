@@ -1,5 +1,5 @@
 // The composed-storefront entrypoint — the EXTRACTED packages wired together via the
-// shared composeStorefront() factory (createStorefront + AttestoMcp.mount + store.gate).
+// shared composeStorefront() factory (createStorefront + AttestoMCP.mount + store.gate).
 //
 // This is the PREVIEW / composition entrypoint behind the stable alias
 // https://attesto-storefront.vercel.app/mcp. It is versioned here (no longer
