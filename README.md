@@ -1,5 +1,18 @@
 # Product Picker MCP App
 
+> ## 📦 This repository is archived — it became **CredentAgent**
+>
+> This demo has moved into the active project, where it's now a thin consumer of the
+> published `@openmobilehub/credentagent-*` packages:
+>
+> - **Repo:** **[openmobilehub/credentagent](https://github.com/openmobilehub/credentagent)**
+> - **Quickstart (try / run / own in ~5 min):** [`examples/quickstart`](https://github.com/openmobilehub/credentagent/tree/main/examples/quickstart)
+> - **Live demo endpoint (add as a custom MCP connector):**
+>   `https://credentagent-demo.vercel.app/mcp` (also `https://mcp-apps-nine.vercel.app/mcp`)
+>
+> This repo is kept read-only so existing links (the videos below, the interoperability
+> report, and partner threads) keep resolving. New work happens in `credentagent`.
+
 <table>
 <tr>
 <td align="center" colspan="3">
