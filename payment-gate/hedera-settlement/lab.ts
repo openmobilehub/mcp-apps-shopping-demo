@@ -3,6 +3,7 @@
 // needs a funded testnet operator (portal.hedera.com faucet) and hits the real
 // network. Run: npm run lab:settle
 import { createOrder } from "../../catalog.js";
+import { SEED_PRODUCTS } from "../../catalog-seed.js";
 import { hederaSettlementConfig } from "./config.js";
 import { settleOrder } from "./settle.js";
 
@@ -20,7 +21,7 @@ async function main() {
   console.log("facilitator /supported:", JSON.stringify(supported, null, 2));
   console.log(`using feePayer ${config.feePayer} — confirm it matches the hedera:testnet signer above.\n`);
 
-  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], `LAB-${Math.random().toString(36).slice(2, 8)}`);
+  const order = createOrder([{ productId: "drift-mouse", quantity: 1 }], `LAB-${Math.random().toString(36).slice(2, 8)}`, SEED_PRODUCTS);
   console.log(`settling order ${order.id} — $${order.total} → tinybar via demo peg…`);
   const record = await settleOrder(order, config);
   console.log("\nSETTLED ✓");

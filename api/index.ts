@@ -1,9 +1,15 @@
-import { createApp } from "../app.js";
+// The committed demo entrypoint (Vercel HTTP) — a THIN CONSUMER of the extracted
+// packages via buildDemoApp() (composeStorefront over the demo's catalog + the
+// agent-native discovery routes). vercel.json routes every path here.
+//
+// buildDemoApp() is async now (it loads the catalog from Firestore at compose time),
+// so we can't export the Express app synchronously. Instead export a handler that
+// builds the app once (memoized) on the first request and delegates every request to
+// it. On Vercel each cold start rebuilds — so a Firestore catalog edit is picked up on
+// the next cold start with no redeploy.
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { buildDemoApp } from "../demo-app.js";
 
-// Vercel @vercel/node runtime: an exported Express app is used as the request
-// handler. vercel.json rewrites every path here, so this one function serves
-// both /mcp and /checkout. State (cart) is shared across invocations via the
-// Redis-backed CartStore; orders are stateless (encoded in the checkout URL).
 function resolvePublicBaseUrl(): string {
   if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL;
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
@@ -12,4 +18,12 @@ function resolvePublicBaseUrl(): string {
   return `http://localhost:${process.env.PORT ?? "3001"}`;
 }
 
-export default createApp({ publicBaseUrl: resolvePublicBaseUrl() });
+let appPromise: ReturnType<typeof buildDemoApp> | null = null;
+function getApp() {
+  return (appPromise ??= buildDemoApp(resolvePublicBaseUrl()));
+}
+
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const store = await getApp();
+  store.app(req, res);
+}
